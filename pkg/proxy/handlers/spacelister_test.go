@@ -33,6 +33,7 @@ func buildSpaceListerFakes(t *testing.T) (*fake.SignupService, *test.FakeClient)
 		newSignup("parentspace", "parent.space", true),
 		newSignup("childspace", "child.space", true),
 		newSignup("grandchildspace", "grandchild.space", true),
+		newSignup("communityspace", "community.space", true),
 	)
 
 	// space that is not provisioned yet
@@ -74,6 +75,8 @@ func buildSpaceListerFakes(t *testing.T) (*fake.SignupService, *test.FakeClient)
 		fake.NewSpace("grandchildspace", "member-1", "grandchildspace", spacetest.WithSpecParentSpace("childspace")),
 		// noise space, user will have a different role here , just to make sure this is not returned anywhere in the tests
 		fake.NewSpace("otherspace", "member-1", "otherspace", spacetest.WithSpecParentSpace("otherspace")),
+		// space flagged as community
+		fake.NewSpace("communityspace", "member-2", "communityspace", spacetest.WithCommunityLabel()),
 
 		//spacebindings
 		fake.NewSpaceBinding("dancer-sb1", "dancelover", "dancelover", "admin"),
@@ -91,6 +94,7 @@ func buildSpaceListerFakes(t *testing.T) (*fake.SignupService, *test.FakeClient)
 		fake.NewSpaceBinding("grandchild-sb1", "grandchildspace", "grandchildspace", "admin"),
 		// noise spacebinding, just to make sure this is not returned anywhere in the tests
 		fake.NewSpaceBinding("parent-sb2", "parentspace", "otherspace", "contributor"),
+		fake.NewSpaceBinding("communityspace-sb", "communityspace", "communityspace", "admin"),
 
 		//nstemplatetier
 		fake.NewBase1NSTemplateTier(),

@@ -60,11 +60,21 @@ func createWorkspaceObject(signupName string, space *toolchainv1alpha1.Space, sp
 	// TODO right now we get SpaceCreatorLabelKey but should get owner from Space once it's implemented
 	ownerName := space.Labels[toolchainv1alpha1.SpaceCreatorLabelKey]
 
+	// get space visibility if set or default to private
+	v := toolchainv1alpha1.WorkspaceVisibilityPrivate
+	sll := space.GetLabels()
+	if sll != nil {
+		if sv, ok := sll[toolchainv1alpha1.WorkspaceVisibilityLabel]; ok {
+			v = sv
+		}
+	}
+
 	wsOptions := []commonproxy.WorkspaceOption{
 		commonproxy.WithNamespaces(space.Status.ProvisionedNamespaces),
 		commonproxy.WithOwner(ownerName),
 		commonproxy.WithRole(spaceBinding.Spec.SpaceRole),
 		commonproxy.WithObjectMetaFrom(space.ObjectMeta),
+		commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, v),
 	}
 	// set the workspace type to "home" to indicate it is the user's home space
 	// TODO set home type based on UserSignup.Status.HomeSpace once it's implemented

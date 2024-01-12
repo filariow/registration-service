@@ -40,6 +40,27 @@ func TestSpaceListerGet(t *testing.T) {
 			overrideSignupFunc   func(ctx *gin.Context, userID, username string, checkUserSignupComplete bool) (*signup.Signup, error)
 			overrideInformerFunc func() service.InformerService
 		}{
+			"community space": {
+				username: "community.space",
+				expectedWs: []toolchainv1alpha1.Workspace{
+					workspaceFor(t, fakeClient, "communityspace", "admin", true,
+						commonproxy.WithAvailableRoles([]string{
+							"admin", "viewer",
+						},
+						),
+						commonproxy.WithBindings([]toolchainv1alpha1.Binding{
+							{
+								MasterUserRecord: "communityspace",
+								Role:             "admin",
+								AvailableActions: []string(nil), // this is system generated so no actions for the user
+							},
+						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityCommunity),
+					),
+				},
+				expectedErr:       "",
+				expectedWorkspace: "communityspace",
+			},
 			"dancelover gets dancelover space": {
 				username: "dance.lover",
 				expectedWs: []toolchainv1alpha1.Workspace{
@@ -64,6 +85,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -97,6 +119,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -121,6 +144,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"}, // since the binding is inherited from parent space, then it can only be overridden
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -155,6 +179,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -195,6 +220,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -314,6 +340,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 				expectedWorkspace: "parentspace",
@@ -337,6 +364,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 				expectedWorkspace: "childspace",
@@ -365,6 +393,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 				expectedWorkspace: "grandchildspace",
@@ -396,6 +425,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 			},
@@ -424,6 +454,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 			},
@@ -451,6 +482,7 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityPrivate),
 					),
 				},
 				expectedWorkspace: "grandchildspace",
@@ -518,6 +550,7 @@ func TestSpaceListerGet(t *testing.T) {
 					for i := range tc.expectedWs {
 						assert.Equal(t, tc.expectedWs[i].Name, workspace.Name)
 						assert.Equal(t, tc.expectedWs[i].Status, workspace.Status)
+						assert.Equal(t, tc.expectedWs[i].Labels, workspace.Labels)
 					}
 				}
 			})
