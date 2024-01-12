@@ -6,15 +6,17 @@ import (
 	"net/http"
 	"time"
 
-	toolchainv1alpha1 "github.com/codeready-toolchain/api/api/v1alpha1"
-	"github.com/codeready-toolchain/registration-service/pkg/context"
-	"github.com/codeready-toolchain/registration-service/pkg/metrics"
 	"github.com/labstack/echo/v4"
 	errs "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+
+	toolchainv1alpha1 "github.com/codeready-toolchain/api/api/v1alpha1"
+	"github.com/codeready-toolchain/registration-service/pkg/context"
+	"github.com/codeready-toolchain/registration-service/pkg/metrics"
+	"github.com/codeready-toolchain/toolchain-common/pkg/workspace"
 )
 
 func HandleSpaceListRequest(spaceLister *SpaceLister) echo.HandlerFunc {
@@ -38,11 +40,13 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister) ([]toolchain
 	if err != nil {
 		return nil, err
 	}
-	// signup is not ready
-	if signup == nil {
-		return []toolchainv1alpha1.Workspace{}, nil
-	}
-	murName := signup.CompliantUsername
+	murName := func() string {
+		// signup is not ready
+		if signup == nil {
+			return workspace.PublicViewerMUR
+		}
+		return signup.CompliantUsername
+	}()
 
 	// get all spacebindings with given mur since no workspace was provided
 	spaceBindings, err := listSpaceBindingsForUser(spaceLister, murName)
@@ -50,7 +54,7 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister) ([]toolchain
 		ctx.Logger().Error(errs.Wrap(err, "error listing space bindings"))
 		return nil, err
 	}
-	return workspacesFromSpaceBindings(ctx, spaceLister, signup.Name, spaceBindings), nil
+	return workspacesFromSpaceBindings(ctx, spaceLister, murName, spaceBindings), nil
 }
 
 func listWorkspaceResponse(ctx echo.Context, workspaces []toolchainv1alpha1.Workspace) error {
@@ -68,7 +72,14 @@ func listWorkspaceResponse(ctx echo.Context, workspaces []toolchainv1alpha1.Work
 }
 
 func listSpaceBindingsForUser(spaceLister *SpaceLister, murName string) ([]toolchainv1alpha1.SpaceBinding, error) {
-	murSelector, err := labels.NewRequirement(toolchainv1alpha1.SpaceBindingMasterUserRecordLabelKey, selection.Equals, []string{murName})
+	murs := func() []string {
+		if murName == workspace.PublicViewerMUR {
+			return []string{murName}
+		}
+		return []string{murName, workspace.PublicViewerMUR}
+	}()
+
+	murSelector, err := labels.NewRequirement(toolchainv1alpha1.SpaceBindingMasterUserRecordLabelKey, selection.In, murs)
 	if err != nil {
 		return nil, err
 	}

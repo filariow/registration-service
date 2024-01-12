@@ -10,8 +10,10 @@ import (
 	toolchainv1alpha1 "github.com/codeready-toolchain/api/api/v1alpha1"
 	"github.com/codeready-toolchain/registration-service/pkg/context"
 	"github.com/codeready-toolchain/registration-service/pkg/metrics"
+	"github.com/codeready-toolchain/registration-service/pkg/signup"
 	commonproxy "github.com/codeready-toolchain/toolchain-common/pkg/proxy"
 	"github.com/codeready-toolchain/toolchain-common/pkg/spacebinding"
+	"github.com/codeready-toolchain/toolchain-common/pkg/workspace"
 	"github.com/labstack/echo/v4"
 	errs "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +49,10 @@ func GetUserWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName 
 	}
 	// signup is not ready
 	if userSignup == nil {
-		return nil, nil
+		userSignup = &signup.Signup{
+			CompliantUsername: workspace.PublicViewerMUR,
+			Name:              workspace.PublicViewerMUR,
+		}
 	}
 	space, err := spaceLister.GetInformerServiceFunc().GetSpace(workspaceName)
 	if err != nil {
@@ -73,9 +78,12 @@ func GetUserWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName 
 	// check if user has access to this workspace
 	userBinding := filterUserSpaceBinding(userSignup.CompliantUsername, allSpaceBindings)
 	if userBinding == nil {
-		//  let's only log the issue and consider this as not found
-		ctx.Logger().Error(fmt.Sprintf("unauthorized access - there is no SpaceBinding present for the user %s and the workspace %s", userSignup.CompliantUsername, workspaceName))
-		return nil, nil
+		userBinding = filterUserSpaceBinding(workspace.PublicViewerMUR, allSpaceBindings)
+		if userBinding == nil {
+			//  let's only log the issue and consider this as not found
+			ctx.Logger().Error(fmt.Sprintf("unauthorized access - there is no SpaceBinding present for the user %s and the workspace %s", userSignup.CompliantUsername, workspaceName))
+			return nil, nil
+		}
 	}
 	// build the Bindings list with the available actions
 	// this field is populated only for the GET workspace request

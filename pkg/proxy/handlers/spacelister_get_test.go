@@ -27,7 +27,7 @@ import (
 )
 
 func TestSpaceListerGet(t *testing.T) {
-	fakeSignupService, fakeClient := buildSpaceListerFakes(t)
+	fakeSignupService, fakeClient := buildSpaceListerFakes(t, true)
 
 	t.Run("HandleSpaceGetRequest", func(t *testing.T) {
 		// given
@@ -52,6 +52,34 @@ func TestSpaceListerGet(t *testing.T) {
 							{
 								MasterUserRecord: "communityspace",
 								Role:             "admin",
+								AvailableActions: []string(nil), // this is system generated so no actions for the user
+							},
+							{
+								MasterUserRecord: "public-viewer",
+								Role:             "viewer",
+								AvailableActions: []string(nil), // this is system generated so no actions for the user
+							},
+						}),
+						commonproxy.WithLabel(toolchainv1alpha1.WorkspaceVisibilityLabel, toolchainv1alpha1.WorkspaceVisibilityCommunity),
+					),
+				},
+				expectedErr:       "",
+				expectedWorkspace: "communityspace",
+			},
+			"communitylover gets communityspace space": {
+				username: "community.lover",
+				expectedWs: []toolchainv1alpha1.Workspace{
+					workspaceFor(t, fakeClient, "communityspace", "viewer", false,
+						commonproxy.WithAvailableRoles([]string{"admin", "viewer"}),
+						commonproxy.WithBindings([]toolchainv1alpha1.Binding{
+							{
+								MasterUserRecord: "communityspace",
+								Role:             "admin",
+								AvailableActions: []string(nil), // this is system generated so no actions for the user
+							},
+							{
+								MasterUserRecord: "public-viewer",
+								Role:             "viewer",
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),

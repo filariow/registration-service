@@ -20,8 +20,8 @@ import (
 	spacetest "github.com/codeready-toolchain/toolchain-common/pkg/test/space"
 )
 
-func buildSpaceListerFakes(t *testing.T) (*fake.SignupService, *test.FakeClient) {
-	fakeSignupService := fake.NewSignupService(
+func buildSpaceListerFakes(t *testing.T, community bool) (*fake.SignupService, *test.FakeClient) {
+	signups := []fake.SignupDef{
 		newSignup("dancelover", "dance.lover", true),
 		newSignup("movielover", "movie.lover", true),
 		newSignup("pandalover", "panda.lover", true),
@@ -33,8 +33,14 @@ func buildSpaceListerFakes(t *testing.T) (*fake.SignupService, *test.FakeClient)
 		newSignup("parentspace", "parent.space", true),
 		newSignup("childspace", "child.space", true),
 		newSignup("grandchildspace", "grandchild.space", true),
-		newSignup("communityspace", "community.space", true),
-	)
+	}
+	if community {
+		signups = append(signups,
+			newSignup("communityspace", "community.space", true),
+			newSignup("communitylover", "community.lover", true),
+		)
+	}
+	fakeSignupService := fake.NewSignupService(signups...)
 
 	// space that is not provisioned yet
 	spaceNotProvisionedYet := fake.NewSpace("pandalover", "member-2", "pandalover")
@@ -61,7 +67,7 @@ func buildSpaceListerFakes(t *testing.T) (*fake.SignupService, *test.FakeClient)
 	spaceBindingWithInvalidSBRNamespace.Labels[toolchainv1alpha1.SpaceBindingRequestLabelKey] = "anime-sbr"
 	spaceBindingWithInvalidSBRNamespace.Labels[toolchainv1alpha1.SpaceBindingRequestNamespaceLabelKey] = "" // let's set the name to blank in order to trigger an error
 
-	fakeClient := fake.InitClient(t,
+	objs := []runtime.Object{
 		// spaces
 		fake.NewSpace("dancelover", "member-1", "dancelover"),
 		fake.NewSpace("movielover", "member-1", "movielover"),
@@ -94,11 +100,17 @@ func buildSpaceListerFakes(t *testing.T) (*fake.SignupService, *test.FakeClient)
 		fake.NewSpaceBinding("grandchild-sb1", "grandchildspace", "grandchildspace", "admin"),
 		// noise spacebinding, just to make sure this is not returned anywhere in the tests
 		fake.NewSpaceBinding("parent-sb2", "parentspace", "otherspace", "contributor"),
-		fake.NewSpaceBinding("communityspace-sb", "communityspace", "communityspace", "admin"),
 
 		//nstemplatetier
 		fake.NewBase1NSTemplateTier(),
-	)
+	}
+	if community {
+		objs = append(objs,
+			fake.NewSpaceBinding("communityspace-sb", "communityspace", "communityspace", "admin"),
+			fake.NewSpaceBinding("community-sb", "public-viewer", "communityspace", "viewer"),
+		)
+	}
+	fakeClient := fake.InitClient(t, objs...)
 
 	return fakeSignupService, fakeClient
 }
