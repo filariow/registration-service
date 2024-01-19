@@ -47,7 +47,24 @@ func (s *ServiceImpl) GetClusterAccess(userID, username, workspace, proxyPluginN
 	}
 	// if signup has the CompliantUsername set it means that MUR was created and useraccount is provisioned
 	if signup == nil || signup.CompliantUsername == "" {
-		cause := errs.New("user is not provisioned (yet)")
+		// check if workspace is set and is community
+		if workspace != "" {
+			space, err := s.Services().InformerService().GetSpace(workspace)
+			if err != nil {
+				// log the actual error but do not return it so that it doesn't reveal information about a space that may not belong to the requestor
+				log.Error(nil, err, "unable to get target cluster for workspace "+workspace)
+				return nil, fmt.Errorf("the requested space is not available")
+			}
+
+			if ll := space.GetLabels(); ll != nil {
+				l, ok := ll[toolchainv1alpha1.WorkspaceVisibilityLabel]
+				if ok && l == toolchainv1alpha1.WorkspaceVisibilityCommunity {
+					return s.accessForSpace(space, "public-viewer", proxyPluginName)
+				}
+			}
+		}
+
+		cause := errs.New(fmt.Sprintf("getting cluster access for workspace %s: user %s (%s) is not provisioned (yet)", workspace, username, userID))
 		log.Error(nil, cause, fmt.Sprintf("signup object: %+v", signup))
 		return nil, cause
 	}

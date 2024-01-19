@@ -43,9 +43,15 @@ func HandleSpaceGetRequest(spaceLister *SpaceLister) echo.HandlerFunc {
 }
 
 func GetUserWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName string) (*toolchainv1alpha1.Workspace, error) {
+	w, _, err := GetUserWorkspaceWithPublicViewer(ctx, spaceLister, workspaceName)
+	return w, err
+}
+
+func GetUserWorkspaceWithPublicViewer(ctx echo.Context, spaceLister *SpaceLister, workspaceName string) (*toolchainv1alpha1.Workspace, bool, error) {
 	userSignup, err := spaceLister.GetProvisionedUserSignup(ctx)
 	if err != nil {
-		return nil, err
+		ctx.Logger().Error(errs.Wrap(err, "provisioned user signup error"))
+		return nil, false, err
 	}
 	// signup is not ready
 	if userSignup == nil {
@@ -57,7 +63,7 @@ func GetUserWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName 
 	space, err := spaceLister.GetInformerServiceFunc().GetSpace(workspaceName)
 	if err != nil {
 		ctx.Logger().Error(errs.Wrap(err, "unable to get space"))
-		return nil, nil
+		return nil, false, nil
 	}
 
 	// recursively get all the spacebindings for the current workspace
@@ -72,9 +78,10 @@ func GetUserWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName 
 	allSpaceBindings, err := spaceBindingLister.ListForSpace(space, []toolchainv1alpha1.SpaceBinding{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to list space bindings")
-		return nil, err
+		return nil, false, err
 	}
 
+	usePublicViewerUser := false
 	// check if user has access to this workspace
 	userBinding := filterUserSpaceBinding(userSignup.CompliantUsername, allSpaceBindings)
 	if userBinding == nil {
@@ -82,28 +89,29 @@ func GetUserWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName 
 		if userBinding == nil {
 			//  let's only log the issue and consider this as not found
 			ctx.Logger().Error(fmt.Sprintf("unauthorized access - there is no SpaceBinding present for the user %s and the workspace %s", userSignup.CompliantUsername, workspaceName))
-			return nil, nil
+			return nil, false, nil
 		}
+		usePublicViewerUser = true
 	}
 	// build the Bindings list with the available actions
 	// this field is populated only for the GET workspace request
 	bindings, err := generateWorkspaceBindings(space, allSpaceBindings)
 	if err != nil {
 		ctx.Logger().Error(errs.Wrap(err, "unable to generate bindings field"))
-		return nil, err
+		return nil, usePublicViewerUser, err
 	}
 
 	// add available roles, this field is populated only for the GET workspace request
 	nsTemplateTier, err := spaceLister.GetInformerServiceFunc().GetNSTemplateTier(space.Spec.TierName)
 	if err != nil {
 		ctx.Logger().Error(errs.Wrap(err, "unable to get nstemplatetier"))
-		return nil, err
+		return nil, usePublicViewerUser, err
 	}
 
 	return createWorkspaceObject(userSignup.Name, space, userBinding,
 		commonproxy.WithAvailableRoles(getRolesFromNSTemplateTier(nsTemplateTier)),
 		commonproxy.WithBindings(bindings),
-	), nil
+	), usePublicViewerUser, nil
 }
 
 func getRolesFromNSTemplateTier(nstemplatetier *toolchainv1alpha1.NSTemplateTier) []string {

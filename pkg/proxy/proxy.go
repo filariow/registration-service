@@ -260,18 +260,18 @@ func (p *Proxy) health(ctx echo.Context) error {
 	return err
 }
 
-func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess, error) {
+func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess, bool, error) {
 	userID, _ := ctx.Get(context.SubKey).(string)
 	username, _ := ctx.Get(context.UsernameKey).(string)
 	proxyPluginName, workspaceName, err := getWorkspaceContext(ctx.Request())
 	if err != nil {
-		return "", nil, crterrors.NewBadRequest("unable to get workspace context", err.Error())
+		return "", nil, false, crterrors.NewBadRequest("unable to get workspace context", err.Error())
 	}
 
 	ctx.Set(context.WorkspaceKey, workspaceName) // set workspace context for logging
 	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, workspaceName, proxyPluginName)
 	if err != nil {
-		return "", nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
+		return "", nil, false, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
 	}
 
 	// before proxying the request, verify that the user has a spacebinding for the workspace and that the namespace (if any) belongs to the workspace
@@ -281,11 +281,11 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 		// validate that the user has access to the workspace by getting all spacebindings recursively, starting from this workspace and going up to the parent workspaces till the "root" of the workspace tree.
 		workspace, err := handlers.GetUserWorkspace(ctx, p.spaceLister, workspaceName)
 		if err != nil {
-			return "", nil, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
+			return "", nil, false, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
 		}
 		if workspace == nil {
 			// not found
-			return "", nil, crterrors.NewForbiddenError("invalid workspace request", fmt.Sprintf("access to workspace '%s' is forbidden", workspaceName))
+			return "", nil, false, crterrors.NewForbiddenError("invalid workspace request", fmt.Sprintf("access to workspace '%s' is forbidden: %s", workspaceName, err.Error()))
 		}
 		// workspace was found means we can forward the request
 		workspaces = []toolchainv1alpha1.Workspace{*workspace}
@@ -293,29 +293,86 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 		// list all workspaces
 		workspaces, err = handlers.ListUserWorkspaces(ctx, p.spaceLister)
 		if err != nil {
-			return "", nil, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
+			return "", nil, false, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
 		}
 	}
 	requestedNamespace := namespaceFromCtx(ctx)
 	if err := validateWorkspaceRequest(workspaceName, requestedNamespace, workspaces); err != nil {
-		return "", nil, crterrors.NewForbiddenError("invalid workspace request", err.Error())
+		return "", nil, false, crterrors.NewForbiddenError("invalid workspace request", err.Error())
 	}
 
-	return proxyPluginName, cluster, nil
+	isCommunity := false
+	for _, w := range workspaces {
+		if w.Name == workspaceName {
+			if len(w.Labels) > 0 {
+				l, ok := w.Labels[toolchainv1alpha1.WorkspaceVisibilityLabel]
+				isCommunity = ok && l == toolchainv1alpha1.WorkspaceVisibilityCommunity
+			}
+
+			break
+		}
+	}
+
+	return proxyPluginName, cluster, isCommunity, nil
+}
+
+type retryResponseWriter struct {
+	headers    http.Header
+	statusCode int
+	body       []byte
+}
+
+func newRetryResponseWriter(writer http.ResponseWriter) *retryResponseWriter {
+	return &retryResponseWriter{
+		headers:    writer.Header(),
+		statusCode: 0,
+		body:       nil,
+	}
+}
+
+func (w *retryResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+}
+
+func (w *retryResponseWriter) Write(body []byte) (int, error) {
+	w.body = body
+	return len(body), nil
+}
+
+func (w *retryResponseWriter) Header() http.Header {
+	return w.headers
 }
 
 func (p *Proxy) handleRequestAndRedirect(ctx echo.Context) error {
 	requestReceivedTime := ctx.Get(context.RequestReceivedTime).(time.Time)
-	proxyPluginName, cluster, err := p.processRequest(ctx)
+	ctx.Logger().Infof("processing request: %s %s", ctx.Request().Method, ctx.Request().URL.Path)
+	proxyPluginName, cluster, isCommunity, err := p.processRequest(ctx)
 	if err != nil {
 		p.metrics.RegServProxyAPIHistogramVec.WithLabelValues(fmt.Sprintf("%d", http.StatusNotAcceptable), metrics.MetricLabelRejected).Observe(time.Since(requestReceivedTime).Seconds())
 		return err
 	}
-	reverseProxy := p.newReverseProxy(ctx, cluster, len(proxyPluginName) > 0)
+
 	routeTime := time.Since(requestReceivedTime)
 	p.metrics.RegServProxyAPIHistogramVec.WithLabelValues(fmt.Sprintf("%d", http.StatusAccepted), cluster.APIURL().Host).Observe(routeTime.Seconds())
 	// Note that ServeHttp is non-blocking and uses a go routine under the hood
-	reverseProxy.ServeHTTP(ctx.Response().Writer, ctx.Request())
+
+	w := newRetryResponseWriter(ctx.Response().Writer)
+	reverseProxy := p.newReverseProxy(ctx, cluster, len(proxyPluginName) > 0, false)
+	reverseProxy.ServeHTTP(w, ctx.Request())
+
+	if isCommunity && w.statusCode == http.StatusForbidden {
+		reverseProxy := p.newReverseProxy(ctx, cluster, len(proxyPluginName) > 0, true)
+		for k := range ctx.Response().Writer.Header().Clone() {
+			ctx.Response().Writer.Header().Del(k)
+		}
+		ctx.Request().Header.Add("Impersonate-User", "public-viewer")
+		reverseProxy.ServeHTTP(ctx.Response().Writer, ctx.Request())
+		return nil
+	}
+	ow := ctx.Response().Writer
+	ow.WriteHeader(w.statusCode)
+	ow.Write(w.body)
+
 	return nil
 }
 
@@ -458,7 +515,7 @@ func extractUserToken(req *http.Request) (string, error) {
 	return token[1], nil
 }
 
-func (p *Proxy) newReverseProxy(ctx echo.Context, target *access.ClusterAccess, isPlugin bool) *httputil.ReverseProxy {
+func (p *Proxy) newReverseProxy(ctx echo.Context, target *access.ClusterAccess, isPlugin bool, publicViewer bool) *httputil.ReverseProxy {
 	req := ctx.Request()
 	targetQuery := target.APIURL().RawQuery
 	director := func(req *http.Request) {
@@ -472,7 +529,11 @@ func (p *Proxy) newReverseProxy(ctx echo.Context, target *access.ClusterAccess, 
 			// route on the member cluster
 			req.Host = target.APIURL().Host
 		}
-		log.InfoEchof(ctx, "forwarding %s to %s", origin, req.URL.String())
+		if publicViewer {
+			log.InfoEchof(ctx, "forwarding %s to %s as public-viewer", origin, req.URL.String())
+		} else {
+			log.InfoEchof(ctx, "forwarding %s to %s", origin, req.URL.String())
+		}
 		if targetQuery == "" || req.URL.RawQuery == "" {
 			req.URL.RawQuery = targetQuery + req.URL.RawQuery
 		} else {
@@ -490,7 +551,12 @@ func (p *Proxy) newReverseProxy(ctx echo.Context, target *access.ClusterAccess, 
 		}
 
 		// Set impersonation header
-		req.Header.Set("Impersonate-User", target.Username())
+		switch publicViewer {
+		case true:
+			req.Header.Set("Impersonate-User", "public-viewer")
+		case false:
+			req.Header.Set("Impersonate-User", target.Username())
+		}
 	}
 	transport := getTransport(req.Header)
 	m := &responseModifier{req.Header.Get("Origin")}
