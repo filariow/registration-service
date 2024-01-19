@@ -345,7 +345,6 @@ func (w *retryResponseWriter) Header() http.Header {
 
 func (p *Proxy) handleRequestAndRedirect(ctx echo.Context) error {
 	requestReceivedTime := ctx.Get(context.RequestReceivedTime).(time.Time)
-	ctx.Logger().Infof("processing request: %s %s", ctx.Request().Method, ctx.Request().URL.Path)
 	proxyPluginName, cluster, isCommunity, err := p.processRequest(ctx)
 	if err != nil {
 		p.metrics.RegServProxyAPIHistogramVec.WithLabelValues(fmt.Sprintf("%d", http.StatusNotAcceptable), metrics.MetricLabelRejected).Observe(time.Since(requestReceivedTime).Seconds())
