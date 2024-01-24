@@ -64,7 +64,7 @@ func (s *ServiceImpl) GetClusterAccess(userID, username, workspace, proxyPluginN
 			}
 		}
 
-		cause := errs.New(fmt.Sprintf("getting cluster access for workspace %s: user %s (%s) is not provisioned (yet)", workspace, username, userID))
+		cause := errs.New("user is not provisioned (yet)")
 		log.Error(nil, cause, fmt.Sprintf("signup object: %+v", signup))
 		return nil, cause
 	}
