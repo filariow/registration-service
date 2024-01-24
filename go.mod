@@ -149,4 +149,4 @@ require (
 
 replace github.com/codeready-toolchain/toolchain-common => github.com/filariow/toolchain-common v0.0.0-20240124160547-076a83f52b21
 
-replace github.com/codeready-toolchain/api => github.com/filariow/toolchain-api v0.0.0-20240123154314-421a107cf272
+replace github.com/codeready-toolchain/api => github.com/filariow/toolchain-api v0.0.0-20240124160710-6f93d29e1071
