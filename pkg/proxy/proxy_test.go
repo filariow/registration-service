@@ -41,6 +41,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -663,10 +664,18 @@ func (s *TestProxySuite) checkProxyOK(fakeApp *fake.ProxyFakeApp, p *Proxy) {
 										// always return a spacebinding for the purposes of the proxy tests, actual testing of the space lister is covered in the space lister tests
 										spaceBindings := []toolchainv1alpha1.SpaceBinding{}
 										for _, req := range reqs {
-											if req.Values().List()[0] == "smith2" || req.Values().List()[0] == "mycoolworkspace" {
+											if req.Key() == toolchainv1alpha1.SpaceBindingMasterUserRecordLabelKey && req.Operator() == selection.In {
+												for _, v := range req.Values().List() {
+													if v == "smith2" || req.Values().List()[0] == "mycoolworkspace" {
+														spaceBindings = append(spaceBindings, *fake.NewSpaceBinding("mycoolworkspace-smith2", "smith2", "mycoolworkspace", "admin"))
+														break
+													}
+												}
+											} else if req.Values().List()[0] == "smith2" || req.Values().List()[0] == "mycoolworkspace" {
 												spaceBindings = append(spaceBindings, *fake.NewSpaceBinding("mycoolworkspace-smith2", "smith2", "mycoolworkspace", "admin"))
 											}
 										}
+
 										return spaceBindings, nil
 									}
 									inf.GetProxyPluginConfigFunc = func(name string) (*toolchainv1alpha1.ProxyPlugin, error) {
