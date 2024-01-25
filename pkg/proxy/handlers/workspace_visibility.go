@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 
 	toolchainv1alpha1 "github.com/codeready-toolchain/api/api/v1alpha1"
 	commonproxy "github.com/codeready-toolchain/toolchain-common/pkg/proxy"
@@ -26,19 +27,23 @@ func HandleWorkspaceVisibilityPatchRequest(spaceLister *SpaceLister, hostClient 
 
 func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostClient client.Client) error {
 	// parse request
+	log.Println("reading body")
 	b, err := io.ReadAll(ctx.Request().Body)
 	if err != nil {
 		ctx.Logger().Error(errs.Wrap(err, "error reading request body"))
 		return errorResponse(ctx, apierrors.NewInternalError(err))
 	}
 
+	log.Println("unmarshaling workspace spec")
 	ws := toolchainv1alpha1.WorkspaceSpec{}
 	if err := json.Unmarshal(b, &ws); err != nil {
 		ctx.Logger().Error(errs.Wrap(err, "error unmarshaling request body to WorkspaceSpec"))
 		return errorResponse(ctx, apierrors.NewInternalError(err))
 	}
 
+	log.Printf("unmarshaled workspace spec: %+v", ws)
 	// fetch space and workspace
+	log.Println("get user space and workspace")
 	workspaceName := ctx.Param("workspace")
 	s, w, err := getUserSpaceAndWorkspace(ctx, spaceLister, workspaceName)
 	if err != nil {
@@ -46,11 +51,14 @@ func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostCl
 	}
 
 	// if no visibility change, return actual workspace
-	if w.Spec.Visibility == ws.Visibility {
+	log.Println("check visibility")
+	if s.Config.Visibility != "" && s.Config.Visibility == ws.Visibility {
+		log.Printf("same visibility (%s), no need to update it", s.Config.Visibility)
 		return getWorkspaceResponse(ctx, w)
 	}
 
 	// update visibility
+	log.Printf("set visibility to %s", ws.Visibility)
 	s.Config.Visibility = ws.Visibility
 	//TODO: impersonate requesting user to leverage on k8s RBAC
 	if err := hostClient.Update(ctx.Request().Context(), s); err != nil {
