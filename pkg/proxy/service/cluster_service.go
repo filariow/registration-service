@@ -56,7 +56,14 @@ func (s *ServiceImpl) GetClusterAccess(userID, username, workspace, proxyPluginN
 				return nil, fmt.Errorf("the requested space is not available")
 			}
 
-			if space.Config.Visibility == toolchainv1alpha1.SpaceVisibilityCommunity {
+			userConfig, err := s.Services().InformerService().GetSpaceUserConfig(space.Name)
+			if err != nil {
+				// log the actual error but do not return it so that it doesn't reveal information about a space that may not belong to the requestor
+				log.Error(nil, err, "unable to get user config for workspace "+workspace)
+				return nil, fmt.Errorf("the requested space is not available")
+			}
+
+			if userConfig.Spec.Visibility == toolchainv1alpha1.SpaceVisibilityCommunity {
 				return s.accessForSpace(space, "public-viewer", proxyPluginName)
 			}
 		}

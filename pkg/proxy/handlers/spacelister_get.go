@@ -101,7 +101,13 @@ func GetUserWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName 
 		return nil, err
 	}
 
-	return createWorkspaceObject(userSignup.Name, space, userBinding,
+	userConfig, err := spaceLister.GetInformerServiceFunc().GetSpaceUserConfig(space.Name)
+	if err != nil {
+		ctx.Logger().Error(errs.Wrap(err, "unable to get space user config"))
+		return nil, err
+	}
+
+	return createWorkspaceObject(userSignup.Name, space, userConfig, userBinding,
 		commonproxy.WithAvailableRoles(getRolesFromNSTemplateTier(nsTemplateTier)),
 		commonproxy.WithBindings(bindings),
 	), nil

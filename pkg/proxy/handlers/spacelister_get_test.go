@@ -60,7 +60,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityCommunity),
 					),
 				},
 				expectedErr:       "",
@@ -83,7 +82,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityCommunity),
 					),
 				},
 				expectedErr:       "",
@@ -113,7 +111,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -147,7 +144,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -172,7 +168,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"}, // since the binding is inherited from parent space, then it can only be overridden
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -207,7 +202,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -248,7 +242,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 				expectedErr:       "",
@@ -368,7 +361,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string(nil), // this is system generated so no actions for the user
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 				expectedWorkspace: "parentspace",
@@ -392,7 +384,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 				expectedWorkspace: "childspace",
@@ -421,7 +412,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 				expectedWorkspace: "grandchildspace",
@@ -453,7 +443,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 			},
@@ -482,7 +471,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 			},
@@ -510,7 +498,6 @@ func TestSpaceListerGet(t *testing.T) {
 								AvailableActions: []string{"override"},
 							},
 						}),
-						commonproxy.WithVisibility(toolchainv1alpha1.SpaceVisibilityPrivate),
 					),
 				},
 				expectedWorkspace: "grandchildspace",

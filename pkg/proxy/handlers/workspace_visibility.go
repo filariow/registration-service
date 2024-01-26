@@ -6,26 +6,38 @@ import (
 	"io"
 	"log"
 
-	toolchainv1alpha1 "github.com/codeready-toolchain/api/api/v1alpha1"
-	commonproxy "github.com/codeready-toolchain/toolchain-common/pkg/proxy"
-	"github.com/codeready-toolchain/toolchain-common/pkg/spacebinding"
 	"github.com/labstack/echo/v4"
 	errs "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	toolchainv1alpha1 "github.com/codeready-toolchain/api/api/v1alpha1"
+	"github.com/codeready-toolchain/registration-service/pkg/context"
+	commonproxy "github.com/codeready-toolchain/toolchain-common/pkg/proxy"
+	"github.com/codeready-toolchain/toolchain-common/pkg/spacebinding"
 )
 
-func HandleWorkspaceVisibilityPatchRequest(spaceLister *SpaceLister, hostClient client.Client) echo.HandlerFunc {
-	// get specific workspace
-	return func(ctx echo.Context) error {
-		return patchWorkspaceVisibility(ctx, spaceLister, hostClient)
+type ImpersonatingClientFunc func(username string) (client.Client, error)
+
+var DefaultImpersonatingClientFuncBuilder = func(cfg *rest.Config, opts client.Options) ImpersonatingClientFunc {
+	return func(username string) (client.Client, error) {
+		cfg.Impersonate.UserName = username
+		return client.New(cfg, opts)
 	}
 }
 
-func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostClient client.Client) error {
+func HandleWorkspaceVisibilityPatchRequest(spaceLister *SpaceLister, hostClient client.Client, clientFunc ImpersonatingClientFunc) echo.HandlerFunc {
+	// get specific workspace
+	return func(ctx echo.Context) error {
+		return patchWorkspaceVisibility(ctx, spaceLister, hostClient, clientFunc)
+	}
+}
+
+func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostClient client.Client, clientFunc ImpersonatingClientFunc) error {
 	// parse request
 	log.Println("reading body")
 	b, err := io.ReadAll(ctx.Request().Body)
@@ -45,24 +57,39 @@ func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostCl
 	// fetch space and workspace
 	log.Println("get user space and workspace")
 	workspaceName := ctx.Param("workspace")
-	s, w, err := getUserSpaceAndWorkspace(ctx, spaceLister, workspaceName)
+	cfg, w, err := getUserSpaceAndWorkspace(ctx, spaceLister, workspaceName)
 	if err != nil {
 		return err
 	}
 
 	// if no visibility change, return actual workspace
 	log.Println("check visibility")
-	if s.Config.Visibility != "" && s.Config.Visibility == ws.Visibility {
-		log.Printf("same visibility (%s), no need to update it", s.Config.Visibility)
+	if cfg.Spec.Visibility == ws.Visibility {
+		log.Printf("same visibility (%s), no need to update it", cfg.Spec.Visibility)
 		return getWorkspaceResponse(ctx, w)
 	}
 
 	// update visibility
 	log.Printf("set visibility to %s", ws.Visibility)
-	s.Config.Visibility = ws.Visibility
-	//TODO: impersonate requesting user to leverage on k8s RBAC
-	if err := hostClient.Update(ctx.Request().Context(), s); err != nil {
-		ctx.Logger().Error(errs.Wrap(err, "error patching space"))
+	cfg.Spec.Visibility = ws.Visibility
+
+	if err != nil {
+		ctx.Logger().Error(errs.Wrap(err, "error building impersonating client"))
+		return errorResponse(ctx, apierrors.NewInternalError(err))
+	}
+
+	// build impersonating client
+	// TODO: try to be smarter here
+	username := ctx.Get(context.UsernameKey).(string)
+	cli, err := clientFunc(username)
+	if err != nil {
+		ctx.Logger().Error(errs.Wrap(err, "error building impersonating client"))
+		return errorResponse(ctx, apierrors.NewInternalError(err))
+	}
+
+	// update space spec
+	if err := cli.Update(ctx.Request().Context(), cfg); err != nil {
+		ctx.Logger().Error(errs.Wrap(err, "error patching space user config"))
 		return errorResponse(ctx, apierrors.NewInternalError(err))
 	}
 
@@ -71,7 +98,7 @@ func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostCl
 	return getWorkspaceResponse(ctx, w)
 }
 
-func getUserSpaceAndWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName string) (*toolchainv1alpha1.Space, *toolchainv1alpha1.Workspace, error) {
+func getUserSpaceAndWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName string) (*toolchainv1alpha1.SpaceUserConfig, *toolchainv1alpha1.Workspace, error) {
 	userSignup, err := spaceLister.GetProvisionedUserSignup(ctx)
 	if err != nil {
 		ctx.Logger().Error(errs.Wrap(err, "provisioned user signup error"))
@@ -126,7 +153,12 @@ func getUserSpaceAndWorkspace(ctx echo.Context, spaceLister *SpaceLister, worksp
 		return nil, nil, err
 	}
 
-	return space, createWorkspaceObject(userSignup.Name, space, userBinding,
+	cfg, err := spaceLister.GetInformerServiceFunc().GetSpaceUserConfig(space.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cfg, createWorkspaceObject(userSignup.Name, space, cfg, userBinding,
 		commonproxy.WithAvailableRoles(getRolesFromNSTemplateTier(nsTemplateTier)),
 		commonproxy.WithBindings(bindings),
 	), nil

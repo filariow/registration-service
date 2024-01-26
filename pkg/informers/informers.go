@@ -18,6 +18,7 @@ import (
 type Informer struct {
 	Masteruserrecord  cache.GenericLister
 	Space             cache.GenericLister
+	SpaceUserConfig   cache.GenericLister
 	SpaceBinding      cache.GenericLister
 	ToolchainStatus   cache.GenericLister
 	UserSignup        cache.GenericLister
@@ -44,6 +45,11 @@ func StartInformer(cfg *rest.Config) (*Informer, chan struct{}, error) {
 	genericSpaceInformer := factory.ForResource(schema.GroupVersionResource{Group: "toolchain.dev.openshift.com", Version: "v1alpha1", Resource: resources.SpaceResourcePlural})
 	informer.Space = genericSpaceInformer.Lister()
 	spaceInformer := genericSpaceInformer.Informer()
+
+	// SpaceUserConfig
+	genericSpaceUserConfigInformer := factory.ForResource(schema.GroupVersionResource{Group: "toolchain.dev.openshift.com", Version: "v1alpha1", Resource: resources.SpaceUserConfigResourcePlural})
+	informer.SpaceUserConfig = genericSpaceUserConfigInformer.Lister()
+	spaceUserConfigInformer := genericSpaceUserConfigInformer.Informer()
 
 	// SpaceBinding
 	genericSpaceBindingInformer := factory.ForResource(schema.GroupVersionResource{Group: "toolchain.dev.openshift.com", Version: "v1alpha1", Resource: resources.SpaceBindingResourcePlural})
@@ -78,6 +84,7 @@ func StartInformer(cfg *rest.Config) (*Informer, chan struct{}, error) {
 	if !cache.WaitForCacheSync(stopper,
 		masterUserRecordInformer.HasSynced,
 		spaceInformer.HasSynced,
+		spaceUserConfigInformer.HasSynced,
 		spaceBindingInformer.HasSynced,
 		toolchainstatusInformer.HasSynced,
 		userSignupInformer.HasSynced,

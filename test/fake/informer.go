@@ -25,6 +25,7 @@ func NewFakeInformer() Informer {
 type Informer struct {
 	GetMurFunc               func(name string) (*toolchainv1alpha1.MasterUserRecord, error)
 	GetSpaceFunc             func(name string) (*toolchainv1alpha1.Space, error)
+	GetSpaceUserConfigFunc   func(name string) (*toolchainv1alpha1.SpaceUserConfig, error)
 	GetToolchainStatusFunc   func() (*toolchainv1alpha1.ToolchainStatus, error)
 	GetUserSignupFunc        func(name string) (*toolchainv1alpha1.UserSignup, error)
 	ListSpaceBindingFunc     func(reqs ...labels.Requirement) ([]toolchainv1alpha1.SpaceBinding, error)
@@ -51,6 +52,13 @@ func (f Informer) GetSpace(name string) (*toolchainv1alpha1.Space, error) {
 		return f.GetSpaceFunc(name)
 	}
 	panic("not supposed to call GetSpace")
+}
+
+func (f Informer) GetSpaceUserConfig(name string) (*toolchainv1alpha1.SpaceUserConfig, error) {
+	if f.GetSpaceFunc != nil {
+		return f.GetSpaceUserConfigFunc(name)
+	}
+	panic("not supposed to call GetSpaceUserConfig")
 }
 
 func (f Informer) GetToolchainStatus() (*toolchainv1alpha1.ToolchainStatus, error) {

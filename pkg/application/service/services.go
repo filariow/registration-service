@@ -11,6 +11,7 @@ import (
 type InformerService interface {
 	GetMasterUserRecord(name string) (*toolchainv1alpha1.MasterUserRecord, error)
 	GetSpace(name string) (*toolchainv1alpha1.Space, error)
+	GetSpaceUserConfig(name string) (*toolchainv1alpha1.SpaceUserConfig, error)
 	GetToolchainStatus() (*toolchainv1alpha1.ToolchainStatus, error)
 	GetUserSignup(name string) (*toolchainv1alpha1.UserSignup, error)
 	ListSpaceBindings(reqs ...labels.Requirement) ([]toolchainv1alpha1.SpaceBinding, error)

@@ -56,7 +56,7 @@ func (s *SpaceLister) GetProvisionedUserSignup(ctx echo.Context) (*signup.Signup
 	return userSignup, nil
 }
 
-func createWorkspaceObject(signupName string, space *toolchainv1alpha1.Space, spaceBinding *toolchainv1alpha1.SpaceBinding, wsAdditionalOptions ...commonproxy.WorkspaceOption) *toolchainv1alpha1.Workspace {
+func createWorkspaceObject(signupName string, space *toolchainv1alpha1.Space, spaceUserConfig *toolchainv1alpha1.SpaceUserConfig, spaceBinding *toolchainv1alpha1.SpaceBinding, wsAdditionalOptions ...commonproxy.WorkspaceOption) *toolchainv1alpha1.Workspace {
 	// TODO right now we get SpaceCreatorLabelKey but should get owner from Space once it's implemented
 	ownerName := space.Labels[toolchainv1alpha1.SpaceCreatorLabelKey]
 
@@ -74,7 +74,7 @@ func createWorkspaceObject(signupName string, space *toolchainv1alpha1.Space, sp
 	wsOptions = append(wsOptions, wsAdditionalOptions...)
 
 	workspace := commonproxy.NewWorkspace(space.GetName(), wsOptions...)
-	workspace.Spec.Visibility = space.Config.Visibility
+	workspace.Spec.Visibility = spaceUserConfig.Spec.Visibility
 	return workspace
 }
 

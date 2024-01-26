@@ -98,7 +98,13 @@ func workspacesFromSpaceBindings(ctx echo.Context, spaceLister *SpaceLister, sig
 			ctx.Logger().Error(nil, err, "unable to get space", "space", spacebinding.Labels[toolchainv1alpha1.SpaceBindingSpaceLabelKey])
 			continue
 		}
-		workspace := createWorkspaceObject(signupName, space, spacebinding)
+
+		userConfig, err := spaceLister.GetInformerServiceFunc().GetSpaceUserConfig(space.Name)
+		if err != nil {
+			ctx.Logger().Error(nil, err, "unable to get space user config", "space", space.Name)
+			continue
+		}
+		workspace := createWorkspaceObject(signupName, space, userConfig, spacebinding)
 		workspaces = append(workspaces, *workspace)
 	}
 	return workspaces

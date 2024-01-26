@@ -81,6 +81,21 @@ func (s *ServiceImpl) GetSpace(name string) (*toolchainv1alpha1.Space, error) {
 	return space, err
 }
 
+func (s *ServiceImpl) GetSpaceUserConfig(name string) (*toolchainv1alpha1.SpaceUserConfig, error) {
+	obj, err := s.informer.SpaceUserConfig.ByNamespace(configuration.Namespace()).Get(name)
+	if err != nil {
+		return nil, err
+	}
+
+	unobj := obj.(*unstructured.Unstructured)
+	space := &toolchainv1alpha1.SpaceUserConfig{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unobj.UnstructuredContent(), space); err != nil {
+		log.Errorf(nil, err, "failed to get Space '%s'", name)
+		return nil, err
+	}
+	return space, err
+}
+
 func (s *ServiceImpl) GetToolchainStatus() (*toolchainv1alpha1.ToolchainStatus, error) {
 	obj, err := s.informer.ToolchainStatus.ByNamespace(configuration.Namespace()).Get(resources.ToolchainStatusName)
 	if err != nil {

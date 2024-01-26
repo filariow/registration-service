@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
@@ -67,9 +68,6 @@ func buildSpaceListerFakes(t *testing.T, community bool) (*fake.SignupService, *
 	spaceBindingWithInvalidSBRNamespace.Labels[toolchainv1alpha1.SpaceBindingRequestLabelKey] = "anime-sbr"
 	spaceBindingWithInvalidSBRNamespace.Labels[toolchainv1alpha1.SpaceBindingRequestNamespaceLabelKey] = "" // let's set the name to blank in order to trigger an error
 
-	cs := fake.NewSpace("communityspace", "member-2", "communityspace")
-	cs.Config = toolchainv1alpha1.SpaceUserConfig{Visibility: toolchainv1alpha1.SpaceVisibilityCommunity}
-
 	objs := []runtime.Object{
 		// spaces
 		fake.NewSpace("dancelover", "member-1", "dancelover"),
@@ -85,7 +83,16 @@ func buildSpaceListerFakes(t *testing.T, community bool) (*fake.SignupService, *
 		// noise space, user will have a different role here , just to make sure this is not returned anywhere in the tests
 		fake.NewSpace("otherspace", "member-1", "otherspace", spacetest.WithSpecParentSpace("otherspace")),
 		// space flagged as community
-		cs,
+		fake.NewSpace("communityspace", "member-2", "communityspace"),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "communityspace",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityCommunity,
+			},
+		},
 
 		//spacebindings
 		fake.NewSpaceBinding("dancer-sb1", "dancelover", "dancelover", "admin"),

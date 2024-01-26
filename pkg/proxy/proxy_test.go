@@ -73,7 +73,7 @@ func (s *TestProxySuite) TestProxy() {
 				Environment(string(environment)))
 			fakeApp := &fake.ProxyFakeApp{}
 			proxyMetrics := metrics.NewProxyMetrics(prometheus.NewRegistry())
-			p, err := newProxyWithClusterClient(fakeApp, nil, proxyMetrics)
+			p, err := newProxyWithClusterClient(fakeApp, nil, proxyMetrics, nil)
 			require.NoError(s.T(), err)
 
 			server := p.StartProxy(ProxyPort)

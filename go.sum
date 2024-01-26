@@ -139,8 +139,6 @@ github.com/evanphx/json-patch v5.6.0+incompatible h1:jBYDEEiFBPxA0v50tFdvOzQQTCv
 github.com/evanphx/json-patch v5.6.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.6.0 h1:b91NhWfaz02IuVxO9faSllyAtNXHMPkC5J8sJCLunww=
 github.com/evanphx/json-patch/v5 v5.6.0/go.mod h1:G79N1coSVB93tBe7j6PhzjmR3/2VvlbKOFpnXhI9Bw4=
-github.com/filariow/toolchain-api v0.0.0-20240124160710-6f93d29e1071 h1:WaifzR0lBX0Xsc1LZwInNW3X7CcsKaWmgq3EjzePpCc=
-github.com/filariow/toolchain-api v0.0.0-20240124160710-6f93d29e1071/go.mod h1:FO7kgXH1x1LqkF327D5a36u0WIrwjVCbeijPkzgwaZc=
 github.com/filariow/toolchain-common v0.0.0-20240124160547-076a83f52b21 h1:qJuZQ1GYCRFjiwTGvp6DYL01SdtlBbn6hdrK4KEizFM=
 github.com/filariow/toolchain-common v0.0.0-20240124160547-076a83f52b21/go.mod h1:VKImhVn9KWm2LsoDj4wf2IKqQvskwLcrio4VA1xy1mA=
 github.com/fsnotify/fsnotify v1.5.4 h1:jRbGcIw6P2Meqdwuo0H1p6JVLbL5DHKAKlYndzMwVZI=

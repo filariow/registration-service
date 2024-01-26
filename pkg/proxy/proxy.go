@@ -67,17 +67,18 @@ type Proxy struct {
 	tokenParser *auth.TokenParser
 	spaceLister *handlers.SpaceLister
 	metrics     *metrics.ProxyMetrics
+	hostCfg     *rest.Config
 }
 
-func NewProxy(app application.Application, proxyMetrics *metrics.ProxyMetrics) (*Proxy, error) {
+func NewProxy(app application.Application, proxyMetrics *metrics.ProxyMetrics, hostCfg *rest.Config) (*Proxy, error) {
 	cl, err := newClusterClient()
 	if err != nil {
 		return nil, err
 	}
-	return newProxyWithClusterClient(app, cl, proxyMetrics)
+	return newProxyWithClusterClient(app, cl, proxyMetrics, hostCfg)
 }
 
-func newProxyWithClusterClient(app application.Application, cln client.Client, proxyMetrics *metrics.ProxyMetrics) (*Proxy, error) {
+func newProxyWithClusterClient(app application.Application, cln client.Client, proxyMetrics *metrics.ProxyMetrics, hostCfg *rest.Config) (*Proxy, error) {
 	tokenParser, err := auth.DefaultTokenParser()
 	if err != nil {
 		return nil, err
@@ -91,6 +92,7 @@ func newProxyWithClusterClient(app application.Application, cln client.Client, p
 		tokenParser: tokenParser,
 		spaceLister: spaceLister,
 		metrics:     proxyMetrics,
+		hostCfg:     hostCfg,
 	}, nil
 }
 
@@ -304,11 +306,7 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 	isCommunity := false
 	for _, w := range workspaces {
 		if w.Name == workspaceName {
-			if len(w.Labels) > 0 {
-				l, ok := w.Labels[toolchainv1alpha1.WorkspaceVisibilityLabel]
-				isCommunity = ok && l == toolchainv1alpha1.WorkspaceVisibilityCommunity
-			}
-
+			isCommunity = w.Spec.Visibility == toolchainv1alpha1.SpaceVisibilityCommunity
 			break
 		}
 	}
