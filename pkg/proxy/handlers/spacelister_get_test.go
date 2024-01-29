@@ -560,7 +560,7 @@ func TestSpaceListerGet(t *testing.T) {
 					require.NoError(t, err)
 					// get workspace case
 					workspace, decodeErr := decodeResponseToWorkspace(rec.Body.Bytes())
-					require.NoError(t, decodeErr)
+					require.NoError(t, decodeErr, "body: %v", string(rec.Body.Bytes()))
 					require.Equal(t, 1, len(tc.expectedWs), "test case should have exactly one expected item since it's a get request")
 					for i := range tc.expectedWs {
 						assert.Equal(t, tc.expectedWs[i].Name, workspace.Name)

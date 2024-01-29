@@ -657,8 +657,17 @@ func (s *TestProxySuite) checkProxyOK(fakeApp *fake.ProxyFakeApp, p *Proxy) {
 										switch name {
 										case "mycoolworkspace":
 											return fake.NewSpace("mycoolworkspace", "member-2", "smith2"), nil
+										default:
+											return nil, fmt.Errorf("space not found error")
 										}
-										return nil, fmt.Errorf("space not found error")
+									}
+									inf.GetSpaceUserConfigFunc = func(name string) (*toolchainv1alpha1.SpaceUserConfig, error) {
+										switch name {
+										case "mycoolworkspace":
+											return &toolchainv1alpha1.SpaceUserConfig{Spec: toolchainv1alpha1.SpaceUserConfigSpec{Visibility: toolchainv1alpha1.SpaceVisibilityPrivate}}, nil
+										default:
+											return nil, fmt.Errorf("error space not found")
+										}
 									}
 									inf.ListSpaceBindingFunc = func(reqs ...labels.Requirement) ([]toolchainv1alpha1.SpaceBinding, error) {
 										// always return a spacebinding for the purposes of the proxy tests, actual testing of the space lister is covered in the space lister tests

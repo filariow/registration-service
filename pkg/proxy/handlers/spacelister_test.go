@@ -71,17 +71,116 @@ func buildSpaceListerFakes(t *testing.T, community bool) (*fake.SignupService, *
 	objs := []runtime.Object{
 		// spaces
 		fake.NewSpace("dancelover", "member-1", "dancelover"),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "dancelover",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		fake.NewSpace("movielover", "member-1", "movielover"),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "movielover",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		fake.NewSpace("racinglover", "member-2", "racinglover"),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "racinglover",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		fake.NewSpace("foodlover", "member-2", "foodlover", spacetest.WithSpecParentSpace("dancelover")),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foodlover",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		fake.NewSpace("animelover", "member-1", "animelover"),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "animelover",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		fake.NewSpace("carlover", "member-1", "carlover"),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "carlover",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		spaceNotProvisionedYet,
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pandalover",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		fake.NewSpace("parentspace", "member-1", "parentspace"),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "parentspace",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		fake.NewSpace("childspace", "member-1", "childspace", spacetest.WithSpecParentSpace("parentspace")),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "childspace",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		fake.NewSpace("grandchildspace", "member-1", "grandchildspace", spacetest.WithSpecParentSpace("childspace")),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "grandchildspace",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		// noise space, user will have a different role here , just to make sure this is not returned anywhere in the tests
 		fake.NewSpace("otherspace", "member-1", "otherspace", spacetest.WithSpecParentSpace("otherspace")),
+		&toolchainv1alpha1.SpaceUserConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "otherspace",
+				Namespace: configuration.Namespace(),
+			},
+			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		},
 		// space flagged as community
 		fake.NewSpace("communityspace", "member-2", "communityspace"),
 		&toolchainv1alpha1.SpaceUserConfig{

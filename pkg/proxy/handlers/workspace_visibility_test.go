@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +13,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,7 +39,7 @@ func TestWorkspaceVisibilityPatch(t *testing.T) {
 		)
 		cfg := &toolchainv1alpha1.SpaceUserConfig{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "owner",
+				Name:      "home",
 				Namespace: configuration.Namespace(),
 			},
 			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
@@ -99,7 +102,7 @@ func TestWorkspaceVisibilityPatch(t *testing.T) {
 		)
 		cfg := &toolchainv1alpha1.SpaceUserConfig{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "owner",
+				Name:      "home",
 				Namespace: configuration.Namespace(),
 			},
 			Spec: toolchainv1alpha1.SpaceUserConfigSpec{
@@ -271,7 +274,19 @@ func TestWorkspaceVisibilityPatch(t *testing.T) {
 		ctx.SetParamNames("workspace")
 		ctx.SetParamValues("owner")
 
-		err := handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) { return fakeClient, nil })(ctx)
+		err := handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) {
+			cl := fake.InitClient(t, sp, cfg)
+			cl.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+				switch username {
+				case "viewer":
+					r := schema.GroupResource{Group: "toolchain.dev.openshift.com", Resource: "look_for_me_in_tests"}
+					return errors.NewForbidden(r, "viewer does not have write access to any resource", fmt.Errorf("error"))
+				default:
+					return cl.Client.Update(ctx, obj, opts...)
+				}
+			}
+			return cl, nil
+		})(ctx)
 		require.NoError(t, err)
 
 		// Then workspace visibility is updated to "private"

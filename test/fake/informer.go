@@ -216,6 +216,11 @@ func GetInformerService(fakeClient client.Client, options ...InformerServiceOpti
 			err := fakeClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: configuration.Namespace()}, space)
 			return space, err
 		}
+		inf.GetSpaceUserConfigFunc = func(name string) (*toolchainv1alpha1.SpaceUserConfig, error) {
+			cfg := &toolchainv1alpha1.SpaceUserConfig{}
+			err := fakeClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: configuration.Namespace()}, cfg)
+			return cfg, err
+		}
 		inf.ListSpaceBindingFunc = func(reqs ...labels.Requirement) ([]toolchainv1alpha1.SpaceBinding, error) {
 			labelMatch := client.MatchingLabels{}
 			for _, r := range reqs {

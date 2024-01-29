@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	errs "github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -89,6 +90,10 @@ func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostCl
 
 	// update space spec
 	if err := cli.Update(ctx.Request().Context(), cfg); err != nil {
+		if errors.IsForbidden(err) {
+			r := schema.GroupResource{Group: "toolchain.dev.openshift.com", Resource: "workspaces"}
+			return errorResponse(ctx, apierrors.NewForbidden(r, "error updating workspace", err))
+		}
 		ctx.Logger().Error(errs.Wrap(err, "error patching space user config"))
 		return errorResponse(ctx, apierrors.NewInternalError(err))
 	}
