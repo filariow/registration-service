@@ -139,6 +139,19 @@ func (p *Proxy) StartProxy(port string) *http.Server {
 	wg := router.Group("/apis/toolchain.dev.openshift.com/v1alpha1/workspaces")
 	// Space lister routes
 	wg.GET("/:workspace", handlers.HandleSpaceGetRequest(p.spaceLister))
+	wg.PUT("/:workspace", handlers.HandleWorkspaceVisibilityPatchRequest(p.spaceLister, p.cl, func(username string) (client.Client, error) {
+		scheme := runtime.NewScheme()
+		if err := toolchainv1alpha1.AddToScheme(scheme); err != nil {
+			return nil, err
+		}
+
+		cfg := rest.CopyConfig(p.hostCfg)
+		cfg.Impersonate.UserName = username
+		return client.New(cfg, client.Options{
+			Scheme: p.cl.Scheme(),
+			Mapper: p.cl.RESTMapper(),
+		})
+	}))
 	wg.GET("", handlers.HandleSpaceListRequest(p.spaceLister))
 	router.GET(proxyHealthEndpoint, p.health)
 	// SSO routes. Used by web login (oc login -w).
@@ -287,7 +300,7 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 		}
 		if workspace == nil {
 			// not found
-			return "", nil, false, crterrors.NewForbiddenError("invalid workspace request", fmt.Sprintf("access to workspace '%s' is forbidden: %s", workspaceName, err.Error()))
+			return "", nil, false, crterrors.NewForbiddenError("invalid workspace request", fmt.Sprintf("access to workspace '%s' is forbidden", workspaceName))
 		}
 		// workspace was found means we can forward the request
 		workspaces = []toolchainv1alpha1.Workspace{*workspace}

@@ -47,8 +47,8 @@ func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostCl
 		return errorResponse(ctx, apierrors.NewInternalError(err))
 	}
 
-	log.Println("unmarshaling workspace spec")
-	ws := toolchainv1alpha1.WorkspaceSpec{}
+	log.Printf("unmarshaling workspace spec from body: %s", string(b))
+	ws := toolchainv1alpha1.Workspace{}
 	if err := json.Unmarshal(b, &ws); err != nil {
 		ctx.Logger().Error(errs.Wrap(err, "error unmarshaling request body to WorkspaceSpec"))
 		return errorResponse(ctx, apierrors.NewInternalError(err))
@@ -65,21 +65,21 @@ func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostCl
 
 	// if no visibility change, return actual workspace
 	log.Println("check visibility")
-	if cfg.Spec.Visibility == ws.Visibility {
+	if cfg.Spec.Visibility == ws.Spec.Visibility {
 		log.Printf("same visibility (%s), no need to update it", cfg.Spec.Visibility)
 		return getWorkspaceResponse(ctx, w)
 	}
 
 	// update visibility
-	log.Printf("set visibility to %s", ws.Visibility)
-	cfg.Spec.Visibility = ws.Visibility
+	log.Printf("set visibility to %s", ws.Spec.Visibility)
+	cfg.Spec.Visibility = ws.Spec.Visibility
 
 	if err != nil {
 		ctx.Logger().Error(errs.Wrap(err, "error building impersonating client"))
 		return errorResponse(ctx, apierrors.NewInternalError(err))
 	}
 
-	// build impersonating client
+	// TODO: build impersonating client
 	// TODO: try to be smarter here
 	username := ctx.Get(context.UsernameKey).(string)
 	cli, err := clientFunc(username)
@@ -88,8 +88,9 @@ func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostCl
 		return errorResponse(ctx, apierrors.NewInternalError(err))
 	}
 
+	// cli := hostClient
 	// update space spec
-	if err := cli.Update(ctx.Request().Context(), cfg); err != nil {
+	if err := cli.Update(ctx.Request().Context(), cfg, &client.UpdateOptions{}); err != nil {
 		if errors.IsForbidden(err) {
 			r := schema.GroupResource{Group: "toolchain.dev.openshift.com", Resource: "workspaces"}
 			return errorResponse(ctx, apierrors.NewForbidden(r, "error updating workspace", err))
@@ -99,7 +100,7 @@ func patchWorkspaceVisibility(ctx echo.Context, spaceLister *SpaceLister, hostCl
 	}
 
 	// update visibility and return workspace
-	w.Spec.Visibility = ws.Visibility
+	w.Spec.Visibility = ws.Spec.Visibility
 	return getWorkspaceResponse(ctx, w)
 }
 
