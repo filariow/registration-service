@@ -1,13 +1,13 @@
 package handlers_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -64,14 +64,25 @@ func TestWorkspaceVisibilityPatch(t *testing.T) {
 
 		// When owner updates home workspace's visibility to community
 		e := echo.New()
-		req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(`{"visibility":"community"}`))
+		uws := toolchainv1alpha1.Workspace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "home",
+			},
+			Spec: toolchainv1alpha1.WorkspaceSpec{
+				Visibility: "community",
+			},
+		}
+		wsj, err := json.Marshal(uws)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPatch, "/", bytes.NewReader(wsj))
 		rec := httptest.NewRecorder()
 		ctx := e.NewContext(req, rec)
 		ctx.Set(rcontext.UsernameKey, "owner")
 		ctx.SetParamNames("workspace")
 		ctx.SetParamValues("home")
 
-		err := handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) { return fakeClient, nil })(ctx)
+		err = handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) { return fakeClient, nil })(ctx)
 		require.NoError(t, err)
 
 		// Then workspace visibility is updated to community
@@ -127,14 +138,25 @@ func TestWorkspaceVisibilityPatch(t *testing.T) {
 
 		// When owner updates home workspace's visibility to private
 		e := echo.New()
-		req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(`{"visibility":"private"}`))
+		uws := toolchainv1alpha1.Workspace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "home",
+			},
+			Spec: toolchainv1alpha1.WorkspaceSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		}
+		wsj, err := json.Marshal(uws)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPatch, "/", bytes.NewReader(wsj))
 		rec := httptest.NewRecorder()
 		ctx := e.NewContext(req, rec)
 		ctx.Set(rcontext.UsernameKey, "owner")
 		ctx.SetParamNames("workspace")
 		ctx.SetParamValues("home")
 
-		err := handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) { return fakeClient, nil })(ctx)
+		err = handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) { return fakeClient, nil })(ctx)
 		require.NoError(t, err)
 
 		// Then workspace visibility is updated to private
@@ -197,14 +219,25 @@ func TestWorkspaceVisibilityPatch(t *testing.T) {
 
 		// When "maintainer" updates "home" workspace's visibility to "private"
 		e := echo.New()
-		req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(`{"visibility":"private"}`))
+		uws := toolchainv1alpha1.Workspace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "owner",
+			},
+			Spec: toolchainv1alpha1.WorkspaceSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		}
+		wsj, err := json.Marshal(uws)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPatch, "/", bytes.NewReader(wsj))
 		rec := httptest.NewRecorder()
 		ctx := e.NewContext(req, rec)
 		ctx.Set(rcontext.UsernameKey, "maintainer")
 		ctx.SetParamNames("workspace")
 		ctx.SetParamValues("owner")
 
-		err := handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) { return fakeClient, nil })(ctx)
+		err = handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) { return fakeClient, nil })(ctx)
 		require.NoError(t, err)
 
 		// Then workspace visibility is updated to "private"
@@ -267,14 +300,25 @@ func TestWorkspaceVisibilityPatch(t *testing.T) {
 
 		// When "maintainer" updates "home" workspace's visibility to "private"
 		e := echo.New()
-		req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(`{"visibility":"private"}`))
+		uws := toolchainv1alpha1.Workspace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "owner",
+			},
+			Spec: toolchainv1alpha1.WorkspaceSpec{
+				Visibility: toolchainv1alpha1.SpaceVisibilityPrivate,
+			},
+		}
+		wsj, err := json.Marshal(uws)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPatch, "/", bytes.NewReader(wsj))
 		rec := httptest.NewRecorder()
 		ctx := e.NewContext(req, rec)
 		ctx.Set(rcontext.UsernameKey, "viewer")
 		ctx.SetParamNames("workspace")
 		ctx.SetParamValues("owner")
 
-		err := handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) {
+		err = handlers.HandleWorkspaceVisibilityPatchRequest(s, fakeClient, func(username string) (client.Client, error) {
 			cl := fake.InitClient(t, sp, cfg)
 			cl.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 				switch username {

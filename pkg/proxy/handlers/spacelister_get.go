@@ -51,6 +51,9 @@ func GetUserWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName 
 		ctx.Logger().Error(errs.Wrap(err, "provisioned user signup error"))
 		return nil, err
 	}
+	if space == nil {
+		return nil, nil
+	}
 	// signup is not ready
 	if userSignup == nil {
 		userSignup = &signup.Signup{
