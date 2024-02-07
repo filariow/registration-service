@@ -113,11 +113,11 @@ func main() {
 	metricsSrv := proxyMetrics.StartMetricsServer()
 
 	// Start the proxy server
-	p, err := proxy.NewProxy(app, proxyMetrics, cfg)
+	p, err := proxy.NewProxy(app, proxyMetrics, cfg, cluster.GetMemberClusters)
 	if err != nil {
 		panic(errs.Wrap(err, "failed to create proxy"))
 	}
-	proxySrv := p.StartProxy(proxy.ProxyPort)
+	proxySrv := p.StartProxy(proxy.DefaultPort)
 
 	// stop the informer when proxy server shuts down
 	proxySrv.RegisterOnShutdown(func() {
@@ -126,7 +126,7 @@ func main() {
 
 	srv := server.New(app)
 
-	err = srv.SetupRoutes(proxy.ProxyPort)
+	err = srv.SetupRoutes(proxy.DefaultPort)
 	if err != nil {
 		panic(err.Error())
 	}

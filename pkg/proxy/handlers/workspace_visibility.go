@@ -146,7 +146,7 @@ func getUserSpaceAndWorkspace(ctx echo.Context, spaceLister *SpaceLister, worksp
 	}
 	// build the Bindings list with the available actions
 	// this field is populated only for the GET workspace request
-	bindings, err := generateWorkspaceBindings(space, allSpaceBindings)
+	bindings, err := generateWorkspaceBindings(space, allSpaceBindings, []toolchainv1alpha1.SpaceBindingRequest{})
 	if err != nil {
 		ctx.Logger().Error(errs.Wrap(err, "unable to generate bindings field"))
 		return nil, nil, err
