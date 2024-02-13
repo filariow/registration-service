@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -113,11 +114,11 @@ func main() {
 	metricsSrv := proxyMetrics.StartMetricsServer()
 
 	// Start the proxy server
-	p, err := proxy.NewProxy(app, proxyMetrics)
+	p, err := proxy.NewProxy(app, proxyMetrics, cluster.GetMemberClusters)
 	if err != nil {
 		panic(errs.Wrap(err, "failed to create proxy"))
 	}
-	proxySrv := p.StartProxy(proxy.ProxyPort)
+	proxySrv := p.StartProxy(proxy.DefaultPort)
 
 	// stop the informer when proxy server shuts down
 	proxySrv.RegisterOnShutdown(func() {
@@ -126,7 +127,7 @@ func main() {
 
 	srv := server.New(app)
 
-	err = srv.SetupRoutes(proxy.ProxyPort)
+	err = srv.SetupRoutes(proxy.DefaultPort)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -139,7 +140,11 @@ func main() {
 		log.Infof(nil, "Service Revision %s built on %s", configuration.Commit, configuration.BuildTime)
 		log.Infof(nil, "Listening on %q...", configuration.HTTPAddress)
 		if err := srv.HTTPServer().ListenAndServe(); err != nil {
-			log.Error(nil, err, err.Error())
+			if errors.Is(err, http.ErrServerClosed) {
+				log.Info(nil, fmt.Sprintf("%s - this is expected when server shutdown has been initiated", err.Error()))
+			} else {
+				log.Error(nil, err, err.Error())
+			}
 		}
 	}()
 

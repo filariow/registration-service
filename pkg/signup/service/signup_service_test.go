@@ -81,16 +81,8 @@ func (s *TestSignupServiceSuite) TestSignup() {
 
 		val := userSignups.Items[0]
 		require.Equal(s.T(), configuration.Namespace(), val.Namespace)
-		require.Equal(s.T(), userID.String(), val.Spec.Userid)
 		require.Equal(s.T(), username, val.Name)
-		require.Equal(s.T(), username, val.Spec.Username)
-		require.Equal(s.T(), "jane", val.Spec.GivenName)
-		require.Equal(s.T(), "doe", val.Spec.FamilyName)
-		require.Equal(s.T(), "red hat", val.Spec.Company)
 		require.True(s.T(), states.VerificationRequired(&val))
-		require.Equal(s.T(), "jsmith@gmail.com", val.Annotations[toolchainv1alpha1.UserSignupUserEmailAnnotationKey])
-		require.Equal(s.T(), "13349822", val.Annotations[toolchainv1alpha1.SSOUserIDAnnotationKey])
-		require.Equal(s.T(), "45983711", val.Annotations[toolchainv1alpha1.SSOAccountIDAnnotationKey])
 		require.Equal(s.T(), "a7b1b413c1cbddbcd19a51222ef8e20a", val.Labels[toolchainv1alpha1.UserSignupUserEmailHashLabelKey])
 		require.Empty(s.T(), val.Annotations[toolchainv1alpha1.SkipAutoCreateSpaceAnnotationKey]) // skip auto create space annotation is not set by default
 
@@ -127,7 +119,7 @@ func (s *TestSignupServiceSuite) TestSignup() {
 	require.NoError(s.T(), err)
 	assert.Empty(s.T(), userSignup.Annotations[toolchainv1alpha1.UserSignupActivationCounterAnnotationKey]) // at this point, the activation counter annotation is not set
 	assert.Empty(s.T(), userSignup.Annotations[toolchainv1alpha1.UserSignupLastTargetClusterAnnotationKey]) // at this point, the last target cluster annotation is not set
-	require.Equal(s.T(), "original-sub-value", userSignup.Spec.OriginalSub)
+	require.Equal(s.T(), "original-sub-value", userSignup.Spec.IdentityClaims.OriginalSub)
 
 	gvr, existing := assertUserSignupExists(userSignup, "jsmith")
 
@@ -531,13 +523,8 @@ func (s *TestSignupServiceSuite) TestFailsIfUserSignupNameAlreadyExists() {
 		ObjectMeta: v1.ObjectMeta{
 			Name:      userID.String(),
 			Namespace: configuration.Namespace(),
-			Annotations: map[string]string{
-				toolchainv1alpha1.UserSignupUserEmailAnnotationKey: "john@gmail.com",
-			},
 		},
-		Spec: toolchainv1alpha1.UserSignupSpec{
-			Username: "john@gmail.com",
-		},
+		Spec: toolchainv1alpha1.UserSignupSpec{},
 	})
 	require.NoError(s.T(), err)
 
@@ -706,13 +693,7 @@ func (s *TestSignupServiceSuite) TestOKIfOtherUserBanned() {
 	val := userSignups.Items[0]
 	require.Equal(s.T(), configuration.Namespace(), val.Namespace)
 	require.Equal(s.T(), "jsmith", val.Name)
-	require.Equal(s.T(), "jsmith", val.Spec.Username)
-	require.Equal(s.T(), userID.String(), val.Spec.Userid)
-	require.Equal(s.T(), "", val.Spec.GivenName)
-	require.Equal(s.T(), "", val.Spec.FamilyName)
-	require.Equal(s.T(), "", val.Spec.Company)
 	require.False(s.T(), states.ApprovedManually(&val))
-	require.Equal(s.T(), "jsmith@gmail.com", val.Annotations[toolchainv1alpha1.UserSignupUserEmailAnnotationKey])
 	require.Equal(s.T(), "a7b1b413c1cbddbcd19a51222ef8e20a", val.Labels[toolchainv1alpha1.UserSignupUserEmailHashLabelKey])
 }
 
@@ -811,7 +792,9 @@ func (s *TestSignupServiceSuite) TestGetSignupStatusNotComplete() {
 			Namespace: configuration.Namespace(),
 		},
 		Spec: toolchainv1alpha1.UserSignupSpec{
-			Username: "bill",
+			IdentityClaims: toolchainv1alpha1.IdentityClaimsEmbedded{
+				PreferredUsername: "bill",
+			},
 		},
 		Status: toolchainv1alpha1.UserSignupStatus{
 			CompliantUsername: "bill",
@@ -949,7 +932,7 @@ func (s *TestSignupServiceSuite) TestGetSignupStatusNotComplete() {
 
 		// when
 		// we set checkUserSignupCompleted to false
-		response, err := svc.GetSignupFromInformer(c, userID.String(), userSignupNotComplete.Spec.Username, false)
+		response, err := svc.GetSignupFromInformer(c, userID.String(), userSignupNotComplete.Spec.IdentityClaims.PreferredUsername, false)
 
 		// then
 		require.NoError(s.T(), err)
@@ -1014,7 +997,9 @@ func (s *TestSignupServiceSuite) TestGetSignupNoStatusNotCompleteCondition() {
 				Namespace: configuration.Namespace(),
 			},
 			Spec: toolchainv1alpha1.UserSignupSpec{
-				Username: "bill",
+				IdentityClaims: toolchainv1alpha1.IdentityClaimsEmbedded{
+					PreferredUsername: "bill",
+				},
 			},
 			Status: status,
 		}
@@ -1025,7 +1010,7 @@ func (s *TestSignupServiceSuite) TestGetSignupNoStatusNotCompleteCondition() {
 		require.NoError(s.T(), err)
 
 		// when
-		response, err := s.Application.SignupService().GetSignup(c, userID.String(), "")
+		response, err := s.Application.SignupService().GetSignup(c, userID.String(), "bill")
 
 		// then
 		require.NoError(s.T(), err)
@@ -1171,7 +1156,7 @@ func (s *TestSignupServiceSuite) TestGetSignupStatusOK() {
 			require.NotNil(s.T(), response)
 
 			require.Equal(s.T(), us.Name, response.Name)
-			require.Equal(s.T(), "ted@domain.com", response.Username)
+			require.Equal(s.T(), "jsmith", response.Username)
 			require.Equal(s.T(), "ted", response.CompliantUsername)
 			assert.True(s.T(), response.Status.Ready)
 			assert.Equal(s.T(), "mur_ready_reason", response.Status.Reason)
@@ -1225,7 +1210,7 @@ func (s *TestSignupServiceSuite) TestGetSignupStatusOK() {
 				require.NoError(s.T(), err)
 				require.NotNil(s.T(), response)
 
-				require.Equal(s.T(), "ted@domain.com", response.Username)
+				require.Equal(s.T(), "jsmith", response.Username)
 				require.Equal(s.T(), "ted", response.CompliantUsername)
 				assert.True(s.T(), response.Status.Ready)
 				assert.Equal(s.T(), "mur_ready_reason", response.Status.Reason)
@@ -1248,7 +1233,7 @@ func (s *TestSignupServiceSuite) TestGetSignupByUsernameOK() {
 	s.ServiceConfiguration(configuration.Namespace(), true, "", 5)
 
 	us := s.newUserSignupComplete()
-	us.Name = service.EncodeUserIdentifier(us.Spec.Username)
+	us.Name = service.EncodeUserIdentifier(us.Spec.IdentityClaims.PreferredUsername)
 	err := s.FakeUserSignupClient.Tracker.Add(us)
 	require.NoError(s.T(), err)
 
@@ -1271,14 +1256,14 @@ func (s *TestSignupServiceSuite) TestGetSignupByUsernameOK() {
 	require.NoError(s.T(), err)
 
 	// when
-	response, err := s.Application.SignupService().GetSignup(c, "foo", us.Spec.Username)
+	response, err := s.Application.SignupService().GetSignup(c, "foo", us.Spec.IdentityClaims.PreferredUsername)
 
 	// then
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), response)
 
 	require.Equal(s.T(), us.Name, response.Name)
-	require.Equal(s.T(), "ted@domain.com", response.Username)
+	require.Equal(s.T(), "jsmith", response.Username)
 	require.Equal(s.T(), "ted", response.CompliantUsername)
 	assert.True(s.T(), response.Status.Ready)
 	assert.Equal(s.T(), "mur_ready_reason", response.Status.Reason)
@@ -1326,14 +1311,14 @@ func (s *TestSignupServiceSuite) TestGetSignupByUsernameOK() {
 		)
 
 		// when
-		response, err := svc.GetSignupFromInformer(c, "foo", us.Spec.Username, true)
+		response, err := svc.GetSignupFromInformer(c, "foo", us.Spec.IdentityClaims.PreferredUsername, true)
 
 		// then
 		require.NoError(s.T(), err)
 		require.NotNil(s.T(), response)
 
 		require.Equal(s.T(), us.Name, response.Name)
-		require.Equal(s.T(), "ted@domain.com", response.Username)
+		require.Equal(s.T(), "jsmith", response.Username)
 		require.Equal(s.T(), "ted", response.CompliantUsername)
 		assert.True(s.T(), response.Status.Ready)
 		assert.Equal(s.T(), "mur_ready_reason", response.Status.Reason)
@@ -1498,7 +1483,7 @@ func (s *TestSignupServiceSuite) TestGetSignupMURGetFails() {
 	})
 }
 
-func (s *TestSignupServiceSuite) TestGetSignupUnknownStatus() {
+func (s *TestSignupServiceSuite) TestGetSignupReadyConditionStatus() {
 	// given
 	s.ServiceConfiguration(configuration.Namespace(), true, "", 5)
 
@@ -1517,54 +1502,110 @@ func (s *TestSignupServiceSuite) TestGetSignupUnknownStatus() {
 		Spec: toolchainv1alpha1.MasterUserRecordSpec{
 			UserAccounts: []toolchainv1alpha1.UserAccountEmbedded{{TargetCluster: "member-123"}},
 		},
-		Status: toolchainv1alpha1.MasterUserRecordStatus{
-			Conditions: []toolchainv1alpha1.Condition{
-				{
-					Type:   toolchainv1alpha1.MasterUserRecordReady,
-					Status: "blah-blah-blah",
-				},
+	}
+
+	tests := map[string]struct {
+		condition              toolchainv1alpha1.Condition
+		expectedConditionReady bool
+	}{
+		"no ready condition": {
+			condition:              toolchainv1alpha1.Condition{},
+			expectedConditionReady: false,
+		},
+		"ready condition without status": {
+			condition: toolchainv1alpha1.Condition{
+				Type:    toolchainv1alpha1.ConditionReady,
+				Reason:  "some reason",
+				Message: "some message",
 			},
+			expectedConditionReady: false,
+		},
+		"ready condition with unknown status": {
+			condition: toolchainv1alpha1.Condition{
+				Type:    toolchainv1alpha1.ConditionReady,
+				Reason:  "some reason",
+				Message: "some message",
+				Status:  apiv1.ConditionUnknown,
+			},
+			expectedConditionReady: false,
+		},
+		"ready condition with false status": {
+			condition: toolchainv1alpha1.Condition{
+				Type:    toolchainv1alpha1.ConditionReady,
+				Reason:  "some reason",
+				Message: "some message",
+				Status:  apiv1.ConditionFalse,
+			},
+			expectedConditionReady: false,
+		},
+		"ready condition with true status": {
+			condition: toolchainv1alpha1.Condition{
+				Type:    toolchainv1alpha1.ConditionReady,
+				Reason:  "some reason",
+				Message: "some message",
+				Status:  apiv1.ConditionTrue,
+			},
+			expectedConditionReady: true,
 		},
 	}
-	err = s.FakeMasterUserRecordClient.Tracker.Add(mur)
-	require.NoError(s.T(), err)
 
-	// when
-	_, err = s.Application.SignupService().GetSignup(c, us.Name, "")
+	for tcName, tc := range tests {
+		s.T().Run(tcName, func(j *testing.T) {
 
-	// then
-	require.EqualError(s.T(), err, "unable to parse readiness status as bool: blah-blah-blah: strconv.ParseBool: parsing \"blah-blah-blah\": invalid syntax")
-
-	s.T().Run("informer", func(t *testing.T) {
-		// given
-		inf := fake.NewFakeInformer()
-		inf.GetUserSignupFunc = func(name string) (*toolchainv1alpha1.UserSignup, error) {
-			if name == us.Name {
-				return us, nil
+			// given
+			mur.Status = toolchainv1alpha1.MasterUserRecordStatus{
+				Conditions: []toolchainv1alpha1.Condition{
+					tc.condition,
+				},
 			}
-			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
-		}
-		inf.GetMurFunc = func(name string) (*toolchainv1alpha1.MasterUserRecord, error) {
-			if name == mur.Name {
-				return mur, nil
+			err = s.FakeMasterUserRecordClient.Tracker.Add(mur)
+			require.NoError(s.T(), err)
+
+			// when
+			response, err := s.Application.SignupService().GetSignup(c, us.Name, "")
+
+			// then
+			require.NoError(s.T(), err)
+			require.Equal(s.T(), tc.expectedConditionReady, response.Status.Ready)
+			require.Equal(s.T(), tc.condition.Reason, response.Status.Reason)
+			require.Equal(s.T(), tc.condition.Message, response.Status.Message)
+
+			// informer case
+			// given
+			inf := fake.NewFakeInformer()
+			inf.GetUserSignupFunc = func(name string) (*toolchainv1alpha1.UserSignup, error) {
+				if name == us.Name {
+					return us, nil
+				}
+				return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 			}
-			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
-		}
+			inf.GetMurFunc = func(name string) (*toolchainv1alpha1.MasterUserRecord, error) {
+				if name == mur.Name {
+					return mur, nil
+				}
+				return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+			}
 
-		s.Application.MockInformerService(inf)
-		svc := service.NewSignupService(
-			fake.MemberClusterServiceContext{
-				Client: s,
-				Svcs:   s.Application,
-			},
-		)
+			s.Application.MockInformerService(inf)
+			svc := service.NewSignupService(
+				fake.MemberClusterServiceContext{
+					Client: s,
+					Svcs:   s.Application,
+				},
+			)
 
-		// when
-		_, err := svc.GetSignupFromInformer(c, us.Name, "", true)
+			// when
+			_, err = svc.GetSignupFromInformer(c, us.Name, "", true)
 
-		// then
-		require.EqualError(s.T(), err, "unable to parse readiness status as bool: blah-blah-blah: strconv.ParseBool: parsing \"blah-blah-blah\": invalid syntax")
-	})
+			// then
+			require.NoError(s.T(), err)
+			require.Equal(s.T(), tc.expectedConditionReady, response.Status.Ready)
+			require.Equal(s.T(), tc.condition.Reason, response.Status.Reason)
+			require.Equal(s.T(), tc.condition.Message, response.Status.Message)
+			err = s.FakeMasterUserRecordClient.Delete(mur.Name, nil)
+			require.NoError(s.T(), err)
+		})
+	}
 }
 
 func (s *TestSignupServiceSuite) TestGetDefaultUserNamespace() {
@@ -1842,12 +1883,12 @@ func (s *TestSignupServiceSuite) TestUpdateUserSignup() {
 		val, err := s.Application.SignupService().GetUserSignupFromIdentifier(us.Name, "")
 		require.NoError(s.T(), err)
 
-		val.Spec.FamilyName = "Johnson"
+		val.Spec.IdentityClaims.FamilyName = "Johnson"
 
 		updated, err := s.Application.SignupService().UpdateUserSignup(val)
 		require.NoError(s.T(), err)
 
-		require.Equal(s.T(), val.Spec.FamilyName, updated.Spec.FamilyName)
+		require.Equal(s.T(), val.Spec.IdentityClaims.FamilyName, updated.Spec.IdentityClaims.FamilyName)
 	})
 
 	s.Run("updateusersignup returns error", func() {
@@ -1973,139 +2014,6 @@ func (s *TestSignupServiceSuite) TestIsPhoneVerificationRequired() {
 
 }
 
-func (s *TestSignupServiceSuite) TestGetSignupUpdatesUserSignupAnnotations() {
-
-	s.ServiceConfiguration(configuration.Namespace(), false, "", 5)
-
-	// Create a new UserSignup, set its UserID and AccountID annotations
-	userSignup := s.newUserSignupComplete()
-
-	err := s.FakeUserSignupClient.Tracker.Add(userSignup)
-	require.NoError(s.T(), err)
-
-	mur := &toolchainv1alpha1.MasterUserRecord{
-		TypeMeta: v1.TypeMeta{},
-		ObjectMeta: v1.ObjectMeta{
-			Name:      userSignup.Status.CompliantUsername,
-			Namespace: configuration.Namespace(),
-		},
-		Spec: toolchainv1alpha1.MasterUserRecordSpec{
-			UserAccounts: []toolchainv1alpha1.UserAccountEmbedded{{TargetCluster: "member-123"}},
-		},
-		Status: toolchainv1alpha1.MasterUserRecordStatus{
-			Conditions: []toolchainv1alpha1.Condition{
-				{
-					Type:   toolchainv1alpha1.MasterUserRecordReady,
-					Status: "true",
-				},
-			},
-		},
-	}
-	err = s.FakeMasterUserRecordClient.Tracker.Add(mur)
-	require.NoError(s.T(), err)
-
-	s.Run("confirm nothing changed when context empty", func() {
-		c, _ := gin.CreateTestContext(httptest.NewRecorder())
-		_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.Username)
-		require.NoError(s.T(), err)
-
-		modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
-		require.NoError(s.T(), err)
-
-		require.NotContains(s.T(), modified.Annotations, toolchainv1alpha1.SSOUserIDAnnotationKey)
-		require.NotContains(s.T(), modified.Annotations, toolchainv1alpha1.SSOAccountIDAnnotationKey)
-	})
-
-	s.Run("userID annotation updated when set in context", func() {
-		c, _ := gin.CreateTestContext(httptest.NewRecorder())
-		c.Set(context.UserIDKey, "888888")
-
-		_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.Username)
-		require.NoError(s.T(), err)
-
-		modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
-		require.NoError(s.T(), err)
-
-		require.Equal(s.T(), "888888", modified.Annotations[toolchainv1alpha1.SSOUserIDAnnotationKey])
-		require.NotContains(s.T(), modified.Annotations, toolchainv1alpha1.SSOAccountIDAnnotationKey)
-	})
-
-	s.Run("confirm nothing changed when context nil", func() {
-		_, err := s.Application.SignupService().GetSignup(nil, userSignup.Name, userSignup.Spec.Username)
-		require.NoError(s.T(), err)
-
-		modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
-		require.NoError(s.T(), err)
-
-		require.Equal(s.T(), "888888", modified.Annotations[toolchainv1alpha1.SSOUserIDAnnotationKey])
-		require.NotContains(s.T(), modified.Annotations, toolchainv1alpha1.SSOAccountIDAnnotationKey)
-	})
-
-	s.Run("accountID annotation updated when set in context and some update attempts fail", func() {
-		counter := 0
-		s.FakeUserSignupClient.MockUpdate = func(value *toolchainv1alpha1.UserSignup) (userSignup *toolchainv1alpha1.UserSignup, e error) {
-			counter++
-			if counter < 3 {
-				s.FakeUserSignupClient.MockUpdate = nil
-				return s.FakeUserSignupClient.Update(value)
-			}
-			return value, nil
-		}
-		defer func() {
-			s.FakeUserSignupClient.MockUpdate = nil
-		}()
-
-		c, _ := gin.CreateTestContext(httptest.NewRecorder())
-		// Set the userID context value to empty string
-		c.Set(context.UserIDKey, "")
-		c.Set(context.AccountIDKey, "1234567890")
-
-		_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.Username)
-		require.NoError(s.T(), err)
-
-		modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
-		require.NoError(s.T(), err)
-
-		// Confirm that the userID annotation wasn't updated
-		require.Equal(s.T(), "888888", modified.Annotations[toolchainv1alpha1.SSOUserIDAnnotationKey])
-		require.Equal(s.T(), "1234567890", modified.Annotations[toolchainv1alpha1.SSOAccountIDAnnotationKey])
-
-		s.Run("userID and accountID annotations not overridden when already set and context values different", func() {
-			c, _ := gin.CreateTestContext(httptest.NewRecorder())
-			// Set the userID and accountID context values to different values
-			c.Set(context.UserIDKey, "7777777")
-			c.Set(context.AccountIDKey, "0987654321")
-
-			_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.Username)
-			require.NoError(s.T(), err)
-
-			modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
-			require.NoError(s.T(), err)
-
-			// Confirm that both annotations are NOT updated
-			require.Equal(s.T(), "888888", modified.Annotations[toolchainv1alpha1.SSOUserIDAnnotationKey])
-			require.Equal(s.T(), "1234567890", modified.Annotations[toolchainv1alpha1.SSOAccountIDAnnotationKey])
-
-			s.Run("userID and accountID annotations not overridden when already set and context values are the same", func() {
-				c, _ := gin.CreateTestContext(httptest.NewRecorder())
-				// Set the userID and accountID context values to same values
-				c.Set(context.UserIDKey, "888888")
-				c.Set(context.AccountIDKey, "1234567890")
-
-				_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.Username)
-				require.NoError(s.T(), err)
-
-				modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
-				require.NoError(s.T(), err)
-
-				// Confirm that both annotations are still not updated
-				require.Equal(s.T(), "888888", modified.Annotations[toolchainv1alpha1.SSOUserIDAnnotationKey])
-				require.Equal(s.T(), "1234567890", modified.Annotations[toolchainv1alpha1.SSOAccountIDAnnotationKey])
-			})
-		})
-	})
-}
-
 func (s *TestSignupServiceSuite) TestGetSignupUpdatesUserSignupIdentityClaims() {
 
 	s.ServiceConfiguration(configuration.Namespace(), false, "", 5)
@@ -2141,7 +2049,7 @@ func (s *TestSignupServiceSuite) TestGetSignupUpdatesUserSignupIdentityClaims() 
 		c, _ := gin.CreateTestContext(httptest.NewRecorder())
 		c.Set(context.UsernameKey, "cocochanel")
 
-		_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.Username)
+		_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.IdentityClaims.PreferredUsername)
 		require.NoError(s.T(), err)
 
 		modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
@@ -2163,7 +2071,7 @@ func (s *TestSignupServiceSuite) TestGetSignupUpdatesUserSignupIdentityClaims() 
 			c, _ := gin.CreateTestContext(httptest.NewRecorder())
 			c.Set(context.GivenNameKey, "Jonathan")
 
-			_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.Username)
+			_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.IdentityClaims.PreferredUsername)
 			require.NoError(s.T(), err)
 
 			modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
@@ -2188,7 +2096,7 @@ func (s *TestSignupServiceSuite) TestGetSignupUpdatesUserSignupIdentityClaims() 
 				c.Set(context.FamilyNameKey, "Smythe")
 				c.Set(context.CompanyKey, "Red Hat")
 
-				_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.Username)
+				_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.IdentityClaims.PreferredUsername)
 				require.NoError(s.T(), err)
 
 				modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
@@ -2215,7 +2123,7 @@ func (s *TestSignupServiceSuite) TestGetSignupUpdatesUserSignupIdentityClaims() 
 					c.Set(context.OriginalSubKey, "jsmythe-original-sub")
 					c.Set(context.EmailKey, "jsmythe@redhat.com")
 
-					_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.Username)
+					_, err := s.Application.SignupService().GetSignup(c, userSignup.Name, userSignup.Spec.IdentityClaims.PreferredUsername)
 					require.NoError(s.T(), err)
 
 					modified, err := s.FakeUserSignupClient.Get(userSignup.Name)
@@ -2251,12 +2159,10 @@ func (s *TestSignupServiceSuite) newUserSignupCompleteWithReason(reason string) 
 			Name:      userID.String(),
 			Namespace: configuration.Namespace(),
 			Annotations: map[string]string{
-				toolchainv1alpha1.UserSignupUserEmailAnnotationKey: "jsmith@redhat.com",
-				toolchainv1alpha1.UserSignupUserEmailHashLabelKey:  "90cb861692508c36933b85dfe43f5369",
+				toolchainv1alpha1.UserSignupUserEmailHashLabelKey: "90cb861692508c36933b85dfe43f5369",
 			},
 		},
 		Spec: toolchainv1alpha1.UserSignupSpec{
-			Username: "ted@domain.com",
 			IdentityClaims: toolchainv1alpha1.IdentityClaimsEmbedded{
 				PropagatedClaims: toolchainv1alpha1.PropagatedClaims{
 					Sub:         "123456789",
