@@ -187,6 +187,7 @@ func (s *TestClusterServiceSuite) TestGetClusterAccess() {
 					si.GetMembersFunc = func(_ ...commoncluster.Condition) []*commoncluster.CachedToolchainCluster {
 						return []*commoncluster.CachedToolchainCluster{}
 					}
+					si.PublicViewerEnabled = func() bool { return false }
 				},
 			)
 			s.Run("default workspace case", func() {
