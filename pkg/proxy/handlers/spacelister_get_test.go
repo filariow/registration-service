@@ -18,6 +18,7 @@ import (
 	"github.com/codeready-toolchain/registration-service/pkg/signup"
 	"github.com/codeready-toolchain/registration-service/test/fake"
 	commoncluster "github.com/codeready-toolchain/toolchain-common/pkg/cluster"
+	"github.com/codeready-toolchain/toolchain-common/pkg/configuration"
 	commonproxy "github.com/codeready-toolchain/toolchain-common/pkg/proxy"
 	"github.com/codeready-toolchain/toolchain-common/pkg/test"
 	spacetest "github.com/codeready-toolchain/toolchain-common/pkg/test/space"
@@ -32,7 +33,13 @@ import (
 )
 
 func TestSpaceListerGet(t *testing.T) {
-	fakeSignupService, fakeClient := buildSpaceListerFakes(t)
+	testSpaceListerGet(t, true)
+	testSpaceListerGet(t, false)
+}
+
+func testSpaceListerGet(t *testing.T, publicViewerEnabled bool) {
+	cfg := &configuration.PublicViewerConfig{Config: &toolchainv1alpha1.PublicViewerConfiguration{Enabled: publicViewerEnabled}}
+	fakeSignupService, fakeClient := buildSpaceListerFakes(t, cfg)
 
 	memberFakeClient := fake.InitClient(t,
 		// spacebinding requests
@@ -564,6 +571,7 @@ func TestSpaceListerGet(t *testing.T) {
 				if tc.overrideGetMembersFunc != nil {
 					getMembersFunc = tc.overrideGetMembersFunc
 				}
+				ctx.Set(rcontext.PublicViewerEnabled, cfg.Enabled())
 				err := handlers.HandleSpaceGetRequest(s, getMembersFunc)(ctx)
 
 				// then
@@ -588,7 +596,6 @@ func TestSpaceListerGet(t *testing.T) {
 }
 
 func TestGetUserWorkspace(t *testing.T) {
-
 	fakeSignupService := fake.NewSignupService(
 		newSignup("batman", "batman.space", true),
 		newSignup("robin", "robin.space", true),
