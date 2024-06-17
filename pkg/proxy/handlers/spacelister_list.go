@@ -41,19 +41,13 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister, publicViewer
 	}
 
 	// signup is not ready
-	var murName *string
-	if signup != nil {
-		murName = &signup.CompliantUsername
-	}
-
 	murNames := func() []string {
 		names := []string{}
+		if signup != nil && signup.CompliantUsername != "" {
+			names = append(names, signup.CompliantUsername)
+		}
 		if publicViewerEnabled {
 			names = append(names, toolchainv1alpha1.KubesawAuthenticatedUsername)
-		}
-
-		if murName != nil {
-			names = append(names, *murName)
 		}
 		return names
 	}()
@@ -67,7 +61,7 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister, publicViewer
 		return nil, err
 	}
 
-	return workspacesFromSpaceBindings(ctx, spaceLister, murName, spaceBindings), nil
+	return workspacesFromSpaceBindings(ctx, spaceLister, murNames[0], spaceBindings), nil
 }
 
 func listWorkspaceResponse(ctx echo.Context, workspaces []toolchainv1alpha1.Workspace) error {
@@ -92,7 +86,7 @@ func listSpaceBindingsForUsers(spaceLister *SpaceLister, murNames []string) ([]t
 	return spaceLister.GetInformerServiceFunc().ListSpaceBindings(*murSelector)
 }
 
-func workspacesFromSpaceBindings(ctx echo.Context, spaceLister *SpaceLister, signupName *string, spaceBindings []toolchainv1alpha1.SpaceBinding) []toolchainv1alpha1.Workspace {
+func workspacesFromSpaceBindings(ctx echo.Context, spaceLister *SpaceLister, signupName string, spaceBindings []toolchainv1alpha1.SpaceBinding) []toolchainv1alpha1.Workspace {
 	workspaces := []toolchainv1alpha1.Workspace{}
 	for i := range spaceBindings {
 		spacebinding := &spaceBindings[i]
