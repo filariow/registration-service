@@ -101,20 +101,14 @@ func GetUserWorkspaceForSignup(ctx echo.Context, spaceLister *SpaceLister, userS
 
 // GetUserWorkspaceWithBindings returns a workspace object with the required fields+bindings (the list with all the users access details)
 func GetUserWorkspaceWithBindings(ctx echo.Context, spaceLister *SpaceLister, workspaceName string, GetMembersFunc cluster.GetMemberClustersFunc, publicViewerEnabled bool) (*toolchainv1alpha1.Workspace, error) {
-	userSignup, space, err := getUserSignupAndSpace(ctx, spaceLister, workspaceName)
+	userSignup, space, err := getUserSignupAndSpace(ctx, spaceLister, workspaceName, publicViewerEnabled)
 	if err != nil {
 		return nil, err
 	}
-	// signup is not ready
-	if space == nil || (userSignup == nil && !publicViewerEnabled) {
-		return nil, nil
-	}
 
-	if userSignup == nil {
-		userSignup = &signup.Signup{
-			CompliantUsername: toolchainv1alpha1.KubesawAuthenticatedUsername,
-			Name:              toolchainv1alpha1.KubesawAuthenticatedUsername,
-		}
+	// signup is not ready
+	if userSignup == nil || space == nil {
+		return nil, nil
 	}
 
 	// recursively get all the spacebindings for the current workspace
@@ -172,10 +166,16 @@ func GetUserWorkspaceWithBindings(ctx echo.Context, spaceLister *SpaceLister, wo
 
 // getUserSignupAndSpace returns the space and the usersignup for a given request.
 // When no space is found a nil value is returned instead of an error.
-func getUserSignupAndSpace(ctx echo.Context, spaceLister *SpaceLister, workspaceName string) (*signup.Signup, *toolchainv1alpha1.Space, error) {
+func getUserSignupAndSpace(ctx echo.Context, spaceLister *SpaceLister, workspaceName string, publicViewerEnabled bool) (*signup.Signup, *toolchainv1alpha1.Space, error) {
 	userSignup, err := spaceLister.GetProvisionedUserSignup(ctx)
 	if err != nil {
 		return nil, nil, err
+	}
+	if userSignup == nil && publicViewerEnabled {
+		userSignup = &signup.Signup{
+			CompliantUsername: toolchainv1alpha1.KubesawAuthenticatedUsername,
+			Name:              toolchainv1alpha1.KubesawAuthenticatedUsername,
+		}
 	}
 
 	space, err := spaceLister.GetInformerServiceFunc().GetSpace(workspaceName)
@@ -183,6 +183,7 @@ func getUserSignupAndSpace(ctx echo.Context, spaceLister *SpaceLister, workspace
 		ctx.Logger().Error(errs.Wrap(err, "unable to get space"))
 		return userSignup, nil, nil
 	}
+
 	return userSignup, space, err
 }
 
