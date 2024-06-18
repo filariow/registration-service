@@ -48,13 +48,6 @@ func TestSpaceListerListCommunity(t *testing.T) {
 			},
 			expectedErr: "",
 		},
-		"nospacer lists spaces": {
-			username: "no.spacer",
-			expectedWs: []toolchainv1alpha1.Workspace{
-				workspaceFor(t, fakeClient, "communityspace", "viewer", false),
-			},
-			expectedErr: "",
-		},
 	}
 
 	t.Run("HandleSpaceListRequest", func(t *testing.T) {

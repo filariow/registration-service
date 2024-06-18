@@ -297,7 +297,8 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 		}
 
 		requestedNamespace := namespaceFromCtx(ctx)
-		if err := validateWorkspaceRequest(workspaceName, requestedNamespace, workspaces); err != nil {
+		if err := validateHomeWorkspaceRequest(requestedNamespace, workspaces); err != nil {
+			ctx.Logger().Errorf("error validating workspace request: %v", err)
 			return "", nil, false, crterrors.NewForbiddenError("invalid workspace request", err.Error())
 		}
 
@@ -725,6 +726,32 @@ func replaceTokenInWebsocketRequest(req *http.Request, newToken string) {
 		}
 	}
 	req.Header.Set(ph, strings.Join(protocols, ","))
+}
+
+func validateHomeWorkspaceRequest(requestedNamespace string, workspaces []toolchainv1alpha1.Workspace) error {
+	hw := func() *toolchainv1alpha1.Workspace {
+		for _, w := range workspaces {
+			if w.Status.Type == "home" {
+				w := w
+				return &w
+			}
+		}
+		return nil
+	}()
+	if hw == nil {
+		return fmt.Errorf("home workspace not found")
+	}
+
+	if requestedNamespace != "" {
+		for _, ns := range hw.Status.Namespaces {
+			if ns.Name == requestedNamespace {
+				return nil
+			}
+		}
+		return fmt.Errorf("access to namespace '%s' in workspace '%s' is forbidden", requestedNamespace, hw.Name)
+	}
+
+	return nil
 }
 
 func validateWorkspaceRequest(requestedWorkspace, requestedNamespace string, workspaces []toolchainv1alpha1.Workspace) error {

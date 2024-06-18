@@ -39,11 +39,14 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister, publicViewer
 	if err != nil {
 		return nil, err
 	}
+	if signup == nil {
+		return nil, nil
+	}
 
 	// signup is not ready
 	murNames := func() []string {
 		names := []string{}
-		if signup != nil && signup.CompliantUsername != "" {
+		if signup.CompliantUsername != "" {
 			names = append(names, signup.CompliantUsername)
 		}
 		if publicViewerEnabled {
@@ -54,6 +57,7 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister, publicViewer
 	if len(murNames) == 0 {
 		return nil, nil
 	}
+
 	// get all spacebindings with given mur since no workspace was provided
 	spaceBindings, err := listSpaceBindingsForUsers(spaceLister, murNames)
 	if err != nil {
@@ -61,7 +65,7 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister, publicViewer
 		return nil, err
 	}
 
-	return workspacesFromSpaceBindings(ctx, spaceLister, murNames[0], spaceBindings), nil
+	return workspacesFromSpaceBindings(ctx, spaceLister, signup.Name, spaceBindings), nil
 }
 
 func listWorkspaceResponse(ctx echo.Context, workspaces []toolchainv1alpha1.Workspace) error {

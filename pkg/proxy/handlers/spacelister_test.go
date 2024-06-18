@@ -37,7 +37,6 @@ func buildSpaceListerFakes(t *testing.T, publicViewerConfig *commonconfig.Public
 	}
 	if publicViewerConfig.Enabled() {
 		signups = append(signups,
-			newSignup("nospacer", "no.spacer", false),
 			newSignup("communityspace", "community.space", true),
 			newSignup("communitylover", "community.lover", true),
 		)
