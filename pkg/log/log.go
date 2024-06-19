@@ -157,6 +157,10 @@ func (l *Logger) InfoEchof(ctx echo.Context, msg string, args ...string) {
 		ctxFields = append(ctxFields, "Impersonate-User", impersonateUser)
 	}
 
+	if publicViewerEnabled, ok := ctx.Get(context.PublicViewerEnabled).(bool); ok {
+		ctxFields = append(ctxFields, "PublicViewerEnabled", publicViewerEnabled)
+	}
+
 	l.infof(ctxFields, msg, args...)
 }
 
