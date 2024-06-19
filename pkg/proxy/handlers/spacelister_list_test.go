@@ -80,7 +80,8 @@ func TestSpaceListerListCommunity(t *testing.T) {
 				ctx.Set(rcontext.RequestReceivedTime, time.Now())
 
 				// when
-				err := handlers.HandleSpaceListRequest(s, cfg.Enabled)(ctx)
+				ctx.Set(rcontext.PublicViewerEnabled, cfg.Enabled())
+				err := handlers.HandleSpaceListRequest(s)(ctx)
 
 				// then
 				if tc.expectedErr != "" {
@@ -206,7 +207,8 @@ func TestSpaceListerList(t *testing.T) {
 				ctx.Set(rcontext.RequestReceivedTime, time.Now())
 
 				// when
-				err := handlers.HandleSpaceListRequest(s, cfg.Enabled)(ctx)
+				ctx.Set(rcontext.PublicViewerEnabled, cfg.Enabled())
+				err := handlers.HandleSpaceListRequest(s)(ctx)
 
 				// then
 				if tc.expectedErr != "" {

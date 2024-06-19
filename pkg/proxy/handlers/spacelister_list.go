@@ -18,11 +18,11 @@ import (
 	"github.com/codeready-toolchain/registration-service/pkg/metrics"
 )
 
-func HandleSpaceListRequest(spaceLister *SpaceLister, publicViewerEnabledFunc func() bool) echo.HandlerFunc {
+func HandleSpaceListRequest(spaceLister *SpaceLister) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
 		// list all user workspaces
 		requestReceivedTime := ctx.Get(context.RequestReceivedTime).(time.Time)
-		workspaces, err := ListUserWorkspaces(ctx, spaceLister, publicViewerEnabledFunc())
+		workspaces, err := ListUserWorkspaces(ctx, spaceLister)
 		if err != nil {
 			spaceLister.ProxyMetrics.RegServWorkspaceHistogramVec.WithLabelValues(fmt.Sprintf("%d", http.StatusInternalServerError), metrics.MetricsLabelVerbList).Observe(time.Since(requestReceivedTime).Seconds()) // using list as the default value for verb to minimize label combinations for prometheus to process
 			return errorResponse(ctx, apierrors.NewInternalError(err))
@@ -34,7 +34,7 @@ func HandleSpaceListRequest(spaceLister *SpaceLister, publicViewerEnabledFunc fu
 
 // ListUserWorkspaces returns a list of Workspaces for the current user.
 // The function lists all SpaceBindings for the user and return all the workspaces found from this list.
-func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister, publicViewerEnabled bool) ([]toolchainv1alpha1.Workspace, error) {
+func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister) ([]toolchainv1alpha1.Workspace, error) {
 	signup, err := spaceLister.GetProvisionedUserSignup(ctx)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister, publicViewer
 		if signup.CompliantUsername != "" {
 			names = append(names, signup.CompliantUsername)
 		}
-		if publicViewerEnabled {
+		if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled {
 			names = append(names, toolchainv1alpha1.KubesawAuthenticatedUsername)
 		}
 		return names

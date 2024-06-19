@@ -95,6 +95,7 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 				ExpectedAPIServerRequestHeaders: map[string][]string{
 					"Authorization":    {"Bearer clusterSAToken"},
 					"Impersonate-User": {"smith2"},
+					"SSO-User":         {"username-" + owner.String()},
 				},
 				ExpectedProxyResponseStatus: http.StatusOK,
 				RequestPath:                 fmt.Sprintf("http://localhost:%s/workspaces/communityspace/api/communityspace/pods", port),

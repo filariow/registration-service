@@ -566,7 +566,8 @@ func TestSpaceListerGet(t *testing.T) {
 				if tc.overrideGetMembersFunc != nil {
 					getMembersFunc = tc.overrideGetMembersFunc
 				}
-				err := handlers.HandleSpaceGetRequest(s, getMembersFunc, cfg.Enabled)(ctx)
+				ctx.Set(rcontext.PublicViewerEnabled, cfg.Enabled())
+				err := handlers.HandleSpaceGetRequest(s, getMembersFunc)(ctx)
 
 				// then
 				if tc.expectedErr != "" {

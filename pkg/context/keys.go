@@ -25,4 +25,6 @@ const (
 	WorkspaceKey = "workspace"
 	// RequestReceivedTime is the context key for the starting time of a request made
 	RequestReceivedTime = "requestReceivedTime"
+	// PublicViewerEnabled is a boolean value indicating whether PublicViewer support is enabled
+	PublicViewerEnabled = "publicViewerEnabled"
 )

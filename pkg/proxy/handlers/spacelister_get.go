@@ -8,6 +8,7 @@ import (
 	"time"
 
 	toolchainv1alpha1 "github.com/codeready-toolchain/api/api/v1alpha1"
+	"github.com/codeready-toolchain/registration-service/pkg/context"
 	regsercontext "github.com/codeready-toolchain/registration-service/pkg/context"
 	"github.com/codeready-toolchain/registration-service/pkg/metrics"
 	"github.com/codeready-toolchain/registration-service/pkg/signup"
@@ -23,11 +24,11 @@ import (
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func HandleSpaceGetRequest(spaceLister *SpaceLister, GetMembersFunc cluster.GetMemberClustersFunc, publicViewerEnabledFunc func() bool) echo.HandlerFunc {
+func HandleSpaceGetRequest(spaceLister *SpaceLister, GetMembersFunc cluster.GetMemberClustersFunc) echo.HandlerFunc {
 	// get specific workspace
 	return func(ctx echo.Context) error {
 		requestReceivedTime := ctx.Get(regsercontext.RequestReceivedTime).(time.Time)
-		workspace, err := GetUserWorkspaceWithBindings(ctx, spaceLister, ctx.Param("workspace"), GetMembersFunc, publicViewerEnabledFunc())
+		workspace, err := GetUserWorkspaceWithBindings(ctx, spaceLister, ctx.Param("workspace"), GetMembersFunc)
 		if err != nil {
 			spaceLister.ProxyMetrics.RegServWorkspaceHistogramVec.WithLabelValues(fmt.Sprintf("%d", http.StatusInternalServerError), metrics.MetricsLabelVerbGet).Observe(time.Since(requestReceivedTime).Seconds()) // using list as the default value for verb to minimize label combinations for prometheus to process
 			return errorResponse(ctx, apierrors.NewInternalError(err))
@@ -100,8 +101,8 @@ func GetUserWorkspaceForSignup(ctx echo.Context, spaceLister *SpaceLister, userS
 }
 
 // GetUserWorkspaceWithBindings returns a workspace object with the required fields+bindings (the list with all the users access details)
-func GetUserWorkspaceWithBindings(ctx echo.Context, spaceLister *SpaceLister, workspaceName string, GetMembersFunc cluster.GetMemberClustersFunc, publicViewerEnabled bool) (*toolchainv1alpha1.Workspace, error) {
-	userSignup, space, err := getUserSignupAndSpace(ctx, spaceLister, workspaceName, publicViewerEnabled)
+func GetUserWorkspaceWithBindings(ctx echo.Context, spaceLister *SpaceLister, workspaceName string, GetMembersFunc cluster.GetMemberClustersFunc) (*toolchainv1alpha1.Workspace, error) {
+	userSignup, space, err := getUserSignupAndSpace(ctx, spaceLister, workspaceName)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +130,7 @@ func GetUserWorkspaceWithBindings(ctx echo.Context, spaceLister *SpaceLister, wo
 	// check if user has access to this workspace
 	userBinding := filterUserSpaceBinding(userSignup.CompliantUsername, allSpaceBindings)
 	if userBinding == nil {
-		if publicViewerEnabled {
+		if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled {
 			userBinding = filterUserSpaceBinding(toolchainv1alpha1.KubesawAuthenticatedUsername, allSpaceBindings)
 		}
 
@@ -169,11 +170,12 @@ func GetUserWorkspaceWithBindings(ctx echo.Context, spaceLister *SpaceLister, wo
 
 // getUserSignupAndSpace returns the space and the usersignup for a given request.
 // When no space is found a nil value is returned instead of an error.
-func getUserSignupAndSpace(ctx echo.Context, spaceLister *SpaceLister, workspaceName string, publicViewerEnabled bool) (*signup.Signup, *toolchainv1alpha1.Space, error) {
+func getUserSignupAndSpace(ctx echo.Context, spaceLister *SpaceLister, workspaceName string) (*signup.Signup, *toolchainv1alpha1.Space, error) {
 	userSignup, err := spaceLister.GetProvisionedUserSignup(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
+	publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool)
 	if userSignup == nil && publicViewerEnabled {
 		userSignup = &signup.Signup{
 			CompliantUsername: toolchainv1alpha1.KubesawAuthenticatedUsername,
