@@ -289,7 +289,7 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 }
 
 func (p *Proxy) processHomeWorkspaceRequest(ctx echo.Context, userID, username, proxyPluginName string) (*access.ClusterAccess, error) {
-	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, "", proxyPluginName)
+	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, "", proxyPluginName, false)
 	if err != nil {
 		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
 	}
@@ -309,7 +309,7 @@ func (p *Proxy) processHomeWorkspaceRequest(ctx echo.Context, userID, username, 
 }
 
 func (p *Proxy) processWorkspaceRequest(ctx echo.Context, userID, username, workspaceName, proxyPluginName string) (*access.ClusterAccess, error) {
-	if err := p.validateClusterAccess(ctx, userID, username, workspaceName, proxyPluginName); err != nil {
+	if err := p.validateSpaceAccess(ctx, userID, username, workspaceName); err != nil {
 		return nil, err
 	}
 
@@ -324,25 +324,45 @@ func (p *Proxy) processWorkspaceRequest(ctx echo.Context, userID, username, work
 		return nil, crterrors.NewForbiddenError("invalid workspace request", err.Error())
 	}
 
-	cluster, err := p.getClusterAccess(ctx, userID, username, workspaceName, proxyPluginName, workspaces)
-	if err != nil {
-		return nil, err
-	}
-
-	return cluster, nil
+	return p.getClusterAccess(ctx, userID, username, workspaceName, proxyPluginName, workspaces)
 }
 
-func (p *Proxy) validateClusterAccess(ctx echo.Context, userID, username, workspaceName, proxyPluginName string) error {
-	_, err := p.app.MemberClusterService().GetClusterAccess(userID, username, workspaceName, proxyPluginName)
-	if err != nil {
-		if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled {
-			_, pverr := p.app.MemberClusterService().GetClusterAccess(toolchainv1alpha1.KubesawAuthenticatedUsername, toolchainv1alpha1.KubesawAuthenticatedUsername, workspaceName, proxyPluginName)
-			if pverr == nil {
-				return nil
-			}
-		}
+func (p *Proxy) validateSpaceAccess(ctx echo.Context, userID, username, workspaceName string) error {
+	if err := p.validateUserAccess(ctx, userID, username); err != nil {
 		return crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
 	}
+	if err := p.validateSpace(workspaceName); err != nil {
+		return crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
+	}
+
+	return nil
+}
+
+func (p *Proxy) validateSpace(workspaceName string) error {
+	if _, err := p.app.InformerService().GetSpace(workspaceName); err != nil {
+		// log the actual error but do not return it so that it doesn't reveal information about a space that may not belong to the requestor
+		log.Error(nil, err, "unable to get target cluster for workspace "+workspaceName)
+		return fmt.Errorf("the requested space is not available")
+	}
+	return nil
+}
+
+func (p *Proxy) validateUserAccess(ctx echo.Context, userID, username string) error {
+	if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled {
+		return nil
+	}
+
+	userSignup, err := p.app.SignupService().GetSignupFromInformer(nil, userID, username, false) // don't check for usersignup complete status, since it might cause the proxy blocking the request and returning an error when quick transitions from ready to provisioning are happening.
+	if err != nil {
+		return err
+	}
+	// if signup has the CompliantUsername set it means that MUR was created and useraccount is provisioned
+	if userSignup == nil || userSignup.CompliantUsername == "" {
+		cause := errs.New("user is not provisioned (yet)")
+		log.Error(nil, cause, fmt.Sprintf("signup object: %+v", userSignup))
+		return cause
+	}
+
 	return nil
 }
 
@@ -365,6 +385,7 @@ func (p *Proxy) getClusterAccess(ctx echo.Context, userID, username, workspaceNa
 		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), "user not found")
 	}
 
+	publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool)
 	hasDirectAccess := func() bool {
 		for _, b := range w.Status.Bindings {
 			if b.MasterUserRecord == signup.CompliantUsername {
@@ -373,19 +394,20 @@ func (p *Proxy) getClusterAccess(ctx echo.Context, userID, username, workspaceNa
 		}
 		return false
 	}
-	if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled && !hasDirectAccess() {
+	if publicViewerEnabled && !hasDirectAccess() {
 		cluster, err := p.app.MemberClusterService().GetClusterAccess(
 			toolchainv1alpha1.KubesawAuthenticatedUsername,
 			toolchainv1alpha1.KubesawAuthenticatedUsername,
 			workspaceName,
-			proxyPluginName)
+			proxyPluginName,
+			publicViewerEnabled)
 		if err != nil {
 			return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
 		}
 		return cluster, nil
 	}
 
-	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, workspaceName, proxyPluginName)
+	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, workspaceName, proxyPluginName, publicViewerEnabled)
 	if err != nil {
 		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
 	}

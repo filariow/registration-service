@@ -188,7 +188,7 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 					return fake.NewBase1NSTemplateTier(), nil
 				}
 				s.Application.MockInformerService(inf)
-				fakeApp.MemberClusterServiceMock = s.newMemberClusterServiceWithMembers(testServer.URL, true)
+				fakeApp.MemberClusterServiceMock = s.newMemberClusterServiceWithMembers(testServer.URL)
 				fakeApp.InformerServiceMock = inf
 
 				p.spaceLister = &handlers.SpaceLister{

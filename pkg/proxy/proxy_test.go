@@ -714,7 +714,8 @@ func (s *TestProxySuite) checkProxyOK(fakeApp *fake.ProxyFakeApp, p *Proxy, cfg 
 										return fake.NewBase1NSTemplateTier(), nil
 									}
 									s.Application.MockInformerService(inf)
-									fakeApp.MemberClusterServiceMock = s.newMemberClusterServiceWithMembers(testServer.URL, false)
+									fakeApp.MemberClusterServiceMock = s.newMemberClusterServiceWithMembers(testServer.URL)
+									fakeApp.InformerServiceMock = inf
 
 									p.spaceLister = &handlers.SpaceLister{
 										GetSignupFunc: fakeApp.SignupServiceMock.GetSignupFromInformer,
@@ -756,7 +757,7 @@ type headerToAdd struct {
 	key, value string
 }
 
-func (s *TestProxySuite) newMemberClusterServiceWithMembers(serverURL string, publicViewerEnabled bool) appservice.MemberClusterService {
+func (s *TestProxySuite) newMemberClusterServiceWithMembers(serverURL string) appservice.MemberClusterService {
 	fakeClient := commontest.NewFakeClient(s.T())
 	serverHost := serverURL
 	switch {
@@ -786,7 +787,6 @@ func (s *TestProxySuite) newMemberClusterServiceWithMembers(serverURL string, pu
 			Svcs:   s.Application,
 		},
 		func(si *service.ServiceImpl) {
-			si.PublicViewerEnabled = func() bool { return publicViewerEnabled }
 			si.GetMembersFunc = func(_ ...commoncluster.Condition) []*commoncluster.CachedToolchainCluster {
 				return []*commoncluster.CachedToolchainCluster{
 					{

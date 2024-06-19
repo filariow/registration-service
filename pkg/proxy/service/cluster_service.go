@@ -25,8 +25,7 @@ type Option func(f *ServiceImpl)
 // ServiceImpl represents the implementation of the member cluster service.
 type ServiceImpl struct { // nolint:revive
 	base.BaseService
-	GetMembersFunc      cluster.GetMemberClustersFunc
-	PublicViewerEnabled func() bool
+	GetMembersFunc cluster.GetMemberClustersFunc
 }
 
 // NewMemberClusterService creates a service object for performing toolchain cluster related activities.
@@ -41,36 +40,20 @@ func NewMemberClusterService(context servicecontext.ServiceContext, options ...O
 	return si
 }
 
-func WithPublicViewer(publicViewerEnabledFunc func() bool) Option {
-	return func(f *ServiceImpl) {
-		f.PublicViewerEnabled = publicViewerEnabledFunc
-	}
-}
-
-func (s *ServiceImpl) GetClusterAccess(userID, username, workspace, proxyPluginName string) (*access.ClusterAccess, error) {
+func (s *ServiceImpl) GetClusterAccess(userID, username, workspace, proxyPluginName string, publicViewerEnabled bool) (*access.ClusterAccess, error) {
 	// if workspace is not provided then return the default space access
 	if workspace == "" {
 		return s.getClusterAccessForDefaultWorkspace(userID, username, proxyPluginName)
 	}
 
-	return s.getSpaceAccess(userID, username, workspace, proxyPluginName)
+	return s.getSpaceAccess(userID, username, workspace, proxyPluginName, publicViewerEnabled)
 }
 
-func (s *ServiceImpl) getSpaceAccess(userID, username, workspace, proxyPluginName string) (*access.ClusterAccess, error) {
-	signup, err := s.Services().SignupService().GetSignupFromInformer(nil, userID, username, false) // don't check for usersignup complete status, since it might cause the proxy blocking the request and returning an error when quick transitions from ready to provisioning are happening.
+func (s *ServiceImpl) getSpaceAccess(userID, username, workspace, proxyPluginName string, publicViewerEnabled bool) (*access.ClusterAccess, error) {
+	userName, err := s.getUserSignupComplaintName(userID, username, publicViewerEnabled)
 	if err != nil {
 		return nil, err
 	}
-	// if signup has the CompliantUsername set it means that MUR was created and useraccount is provisioned
-	if signup == nil || signup.CompliantUsername == "" {
-		if s.PublicViewerEnabled() {
-			return s.getSpaceAccessAsPublicViewer(workspace, proxyPluginName)
-		}
-
-		cause := errs.New("user is not provisioned (yet)")
-		log.Error(nil, cause, fmt.Sprintf("signup object: %+v", signup))
-		return nil, cause
-	}
 
 	// look up space
 	space, err := s.Services().InformerService().GetSpace(workspace)
@@ -80,20 +63,26 @@ func (s *ServiceImpl) getSpaceAccess(userID, username, workspace, proxyPluginNam
 		return nil, fmt.Errorf("the requested space is not available")
 	}
 
-	return s.accessForSpace(space, signup.CompliantUsername, proxyPluginName)
+	return s.accessForSpace(space, userName, proxyPluginName)
 }
 
-func (s *ServiceImpl) getSpaceAccessAsPublicViewer(workspace, proxyPluginName string) (*access.ClusterAccess, error) {
-	// look up space
-	space, err := s.Services().InformerService().GetSpace(workspace)
-	if err != nil {
-		// log the actual error but do not return it so that it doesn't reveal information about a space that may not belong to the requestor
-		log.Error(nil, err, "unable to get target cluster for workspace "+workspace)
-		return nil, fmt.Errorf("the requested space is not available")
+func (s *ServiceImpl) getUserSignupComplaintName(userID, username string, publicViewerEnabled bool) (string, error) {
+	if publicViewerEnabled && username == userID && userID == toolchainv1alpha1.KubesawAuthenticatedUsername {
+		return username, nil
 	}
 
-	// return access as public-viewer
-	return s.accessForSpace(space, toolchainv1alpha1.KubesawAuthenticatedUsername, proxyPluginName)
+	userSignup, err := s.Services().SignupService().GetSignupFromInformer(nil, userID, username, false) // don't check for usersignup complete status, since it might cause the proxy blocking the request and returning an error when quick transitions from ready to provisioning are happening.
+	if err != nil {
+		return "", err
+	}
+	// if signup has the CompliantUsername set it means that MUR was created and useraccount is provisioned
+	if userSignup == nil || userSignup.CompliantUsername == "" {
+		cause := errs.New("user is not provisioned (yet)")
+		log.Error(nil, cause, fmt.Sprintf("signup object: %+v", userSignup))
+		return "", cause
+	}
+
+	return userSignup.CompliantUsername, nil
 }
 
 func (s *ServiceImpl) getClusterAccessForDefaultWorkspace(userID, username, proxyPluginName string) (*access.ClusterAccess, error) {
