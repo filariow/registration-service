@@ -309,6 +309,10 @@ func (p *Proxy) processHomeWorkspaceRequest(ctx echo.Context, userID, username, 
 }
 
 func (p *Proxy) processWorkspaceRequest(ctx echo.Context, userID, username, workspaceName, proxyPluginName string) (*access.ClusterAccess, error) {
+	if err := p.validateClusterAccess(ctx, userID, username, workspaceName, proxyPluginName); err != nil {
+		return nil, err
+	}
+
 	// before proxying the request, verify that the user has a spacebinding for the workspace and that the namespace (if any) belongs to the workspace
 	workspaces, err := p.listUserWorkspaces(ctx, workspaceName)
 	if err != nil {
@@ -322,11 +326,24 @@ func (p *Proxy) processWorkspaceRequest(ctx echo.Context, userID, username, work
 
 	cluster, err := p.getClusterAccess(ctx, userID, username, workspaceName, proxyPluginName, workspaces)
 	if err != nil {
-		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
+		return nil, err
 	}
 
-	ctx.Logger().Infof("*** Cluster: %+v\n", cluster)
 	return cluster, nil
+}
+
+func (p *Proxy) validateClusterAccess(ctx echo.Context, userID, username, workspaceName, proxyPluginName string) error {
+	_, err := p.app.MemberClusterService().GetClusterAccess(userID, username, workspaceName, proxyPluginName)
+	if err != nil {
+		if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled {
+			_, pverr := p.app.MemberClusterService().GetClusterAccess(toolchainv1alpha1.KubesawAuthenticatedUsername, toolchainv1alpha1.KubesawAuthenticatedUsername, workspaceName, proxyPluginName)
+			if pverr == nil {
+				return nil
+			}
+		}
+		return crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
+	}
+	return nil
 }
 
 func (p *Proxy) getClusterAccess(ctx echo.Context, userID, username, workspaceName, proxyPluginName string, workspaces []toolchainv1alpha1.Workspace) (*access.ClusterAccess, error) {
@@ -356,7 +373,6 @@ func (p *Proxy) getClusterAccess(ctx echo.Context, userID, username, workspaceNa
 		}
 		return false
 	}
-	ctx.Logger().Infof(fmt.Sprintf("has direct access: %v\nMUR: %v\nSBS: %v", hasDirectAccess(), username, w.Status.Bindings))
 	if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled && !hasDirectAccess() {
 		cluster, err := p.app.MemberClusterService().GetClusterAccess(
 			toolchainv1alpha1.KubesawAuthenticatedUsername,
@@ -373,7 +389,7 @@ func (p *Proxy) getClusterAccess(ctx echo.Context, userID, username, workspaceNa
 	if err != nil {
 		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
 	}
-	return cluster, err
+	return cluster, nil
 }
 
 func (p *Proxy) listUserWorkspaces(ctx echo.Context, workspaceName string) ([]toolchainv1alpha1.Workspace, error) {
