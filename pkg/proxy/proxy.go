@@ -277,6 +277,13 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 	}
 
 	ctx.Set(context.WorkspaceKey, workspaceName) // set workspace context for logging
+	if workspaceName == "" {
+		return p.processHomeWorkspaceRequest(ctx, userID, username, proxyPluginName)
+	}
+	return p.processWorkspaceRequest(ctx, userID, username, workspaceName, proxyPluginName)
+}
+
+func (p *Proxy) processWorkspaceRequest(ctx echo.Context, userID, username, workspaceName, proxyPluginName string) (string, *access.ClusterAccess, error) {
 	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, workspaceName, proxyPluginName)
 	if err != nil {
 		return "", nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
@@ -296,28 +303,39 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 	return proxyPluginName, cluster, nil
 }
 
-func (p *Proxy) listUserWorkspaces(ctx echo.Context, workspaceName string) ([]toolchainv1alpha1.Workspace, error) {
-	if workspaceName != "" {
-		// when a workspace name was provided
-		// validate that the user has access to the workspace by getting all spacebindings recursively, starting from this workspace and going up to the parent workspaces till the "root" of the workspace tree.
-		workspace, err := handlers.GetUserWorkspace(ctx, p.spaceLister, workspaceName)
-		if err != nil {
-			return nil, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
-		}
-		if workspace == nil {
-			// not found
-			return nil, crterrors.NewForbiddenError("invalid workspace request", fmt.Sprintf("access to workspace '%s' is forbidden", workspaceName))
-		}
-		// workspace was found means we can forward the request
-		return []toolchainv1alpha1.Workspace{*workspace}, nil
+func (p *Proxy) processHomeWorkspaceRequest(ctx echo.Context, userID, username, proxyPluginName string) (string, *access.ClusterAccess, error) {
+	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, "", proxyPluginName)
+	if err != nil {
+		return "", nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
 	}
 
 	// list all workspaces
 	workspaces, err := handlers.ListUserWorkspaces(ctx, p.spaceLister, configuration.GetRegistrationServiceConfig().PublicViewer().Enabled())
 	if err != nil {
+		return "", nil, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
+	}
+
+	requestedNamespace := namespaceFromCtx(ctx)
+	if err := validateWorkspaceRequest("", requestedNamespace, workspaces); err != nil {
+		return "", nil, crterrors.NewForbiddenError("invalid workspace request", err.Error())
+	}
+
+	return proxyPluginName, cluster, nil
+}
+
+func (p *Proxy) listUserWorkspaces(ctx echo.Context, workspaceName string) ([]toolchainv1alpha1.Workspace, error) {
+	// when a workspace name was provided
+	// validate that the user has access to the workspace by getting all spacebindings recursively, starting from this workspace and going up to the parent workspaces till the "root" of the workspace tree.
+	workspace, err := handlers.GetUserWorkspace(ctx, p.spaceLister, workspaceName)
+	if err != nil {
 		return nil, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
 	}
-	return workspaces, nil
+	if workspace == nil {
+		// not found
+		return nil, crterrors.NewForbiddenError("invalid workspace request", fmt.Sprintf("access to workspace '%s' is forbidden", workspaceName))
+	}
+	// workspace was found means we can forward the request
+	return []toolchainv1alpha1.Workspace{*workspace}, nil
 }
 
 func (p *Proxy) handleRequestAndRedirect(ctx echo.Context) error {
