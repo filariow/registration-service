@@ -278,55 +278,112 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 
 	ctx.Set(context.WorkspaceKey, workspaceName) // set workspace context for logging
 	if workspaceName == "" {
-		return p.processHomeWorkspaceRequest(ctx, userID, username, proxyPluginName)
-	}
-	return p.processWorkspaceRequest(ctx, userID, username, workspaceName, proxyPluginName)
-}
-
-func (p *Proxy) processWorkspaceRequest(ctx echo.Context, userID, username, workspaceName, proxyPluginName string) (string, *access.ClusterAccess, error) {
-	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, workspaceName, proxyPluginName)
-	if err != nil {
-		return "", nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
+		cluster, err := p.processHomeWorkspaceRequest(ctx, userID, username, proxyPluginName)
+		if err != nil {
+			return "", nil, err
+		}
+		return proxyPluginName, cluster, nil
 	}
 
-	// before proxying the request, verify that the user has a spacebinding for the workspace and that the namespace (if any) belongs to the workspace
-	workspaces, err := p.listUserWorkspaces(ctx, workspaceName)
+	cluster, err := p.processWorkspaceRequest(ctx, userID, username, workspaceName, proxyPluginName)
 	if err != nil {
 		return "", nil, err
 	}
-
-	requestedNamespace := namespaceFromCtx(ctx)
-	if err := validateWorkspaceRequest(workspaceName, requestedNamespace, workspaces); err != nil {
-		return "", nil, crterrors.NewForbiddenError("invalid workspace request", err.Error())
-	}
-
 	return proxyPluginName, cluster, nil
 }
 
-func (p *Proxy) processHomeWorkspaceRequest(ctx echo.Context, userID, username, proxyPluginName string) (string, *access.ClusterAccess, error) {
+func (p *Proxy) processHomeWorkspaceRequest(ctx echo.Context, userID, username, proxyPluginName string) (*access.ClusterAccess, error) {
 	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, "", proxyPluginName)
 	if err != nil {
-		return "", nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
+		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
 	}
 
 	// list all workspaces
 	workspaces, err := handlers.ListUserWorkspaces(ctx, p.spaceLister, configuration.GetRegistrationServiceConfig().PublicViewer().Enabled())
 	if err != nil {
-		return "", nil, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
+		return nil, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
 	}
 
 	requestedNamespace := namespaceFromCtx(ctx)
 	if err := validateWorkspaceRequest("", requestedNamespace, workspaces); err != nil {
-		return "", nil, crterrors.NewForbiddenError("invalid workspace request", err.Error())
+		return nil, crterrors.NewForbiddenError("invalid workspace request", err.Error())
 	}
 
-	return proxyPluginName, cluster, nil
+	return cluster, nil
+}
+
+func (p *Proxy) processWorkspaceRequest(ctx echo.Context, userID, username, workspaceName, proxyPluginName string) (*access.ClusterAccess, error) {
+	// before proxying the request, verify that the user has a spacebinding for the workspace and that the namespace (if any) belongs to the workspace
+	workspaces, err := p.listUserWorkspaces(ctx, workspaceName)
+	if err != nil {
+		return nil, err
+	}
+
+	requestedNamespace := namespaceFromCtx(ctx)
+	if err := validateWorkspaceRequest(workspaceName, requestedNamespace, workspaces); err != nil {
+		return nil, crterrors.NewForbiddenError("invalid workspace request", err.Error())
+	}
+
+	cluster, err := p.getClusterAccess(userID, username, workspaceName, proxyPluginName, workspaces)
+	if err != nil {
+		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
+	}
+
+	ctx.Logger().Infof("*** Cluster: %+v\n", cluster)
+	return cluster, nil
+}
+
+func (p *Proxy) getClusterAccess(userID, username, workspaceName, proxyPluginName string, workspaces []toolchainv1alpha1.Workspace) (*access.ClusterAccess, error) {
+	w := func() *toolchainv1alpha1.Workspace {
+		for _, w := range workspaces {
+			if w.Name == workspaceName {
+				w := w
+				return &w
+			}
+		}
+		return nil
+	}()
+	if w == nil {
+		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), "workspace not found")
+	}
+
+	hasDirectAccess := func() bool {
+		for _, b := range w.Status.Bindings {
+			if b.MasterUserRecord == username {
+				return true
+			}
+		}
+		return false
+	}()
+	if configuration.GetRegistrationServiceConfig().PublicViewer().Enabled() && !hasDirectAccess {
+		cluster, err := p.app.MemberClusterService().GetClusterAccess(
+			toolchainv1alpha1.KubesawAuthenticatedUsername,
+			toolchainv1alpha1.KubesawAuthenticatedUsername,
+			workspaceName,
+			proxyPluginName)
+		if err != nil {
+			return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
+		}
+		return cluster, nil
+	}
+
+	cluster, err := p.app.MemberClusterService().GetClusterAccess(userID, username, workspaceName, proxyPluginName)
+	if err != nil {
+		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), err.Error())
+	}
+	return cluster, err
 }
 
 func (p *Proxy) listUserWorkspaces(ctx echo.Context, workspaceName string) ([]toolchainv1alpha1.Workspace, error) {
 	// when a workspace name was provided
 	// validate that the user has access to the workspace by getting all spacebindings recursively, starting from this workspace and going up to the parent workspaces till the "root" of the workspace tree.
-	workspace, err := handlers.GetUserWorkspace(ctx, p.spaceLister, workspaceName)
+	workspace, err := handlers.GetUserWorkspaceWithBindings(
+		ctx,
+		p.spaceLister,
+		workspaceName,
+		p.getMembersFunc,
+		// TODO(@filariow): move this into context
+		configuration.GetRegistrationServiceConfig().PublicViewer().Enabled())
 	if err != nil {
 		return nil, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
 	}
@@ -495,11 +552,14 @@ func extractUserToken(req *http.Request) (string, error) {
 func (p *Proxy) newReverseProxy(ctx echo.Context, target *access.ClusterAccess, isPlugin bool) *httputil.ReverseProxy {
 	req := ctx.Request()
 	targetQuery := target.APIURL().RawQuery
+	username, _ := ctx.Get(context.UsernameKey).(string)
+	ctx.Set("Impersonate-User", target.Username())
 	director := func(req *http.Request) {
 		origin := req.URL.String()
 		req.URL.Scheme = target.APIURL().Scheme
 		req.URL.Host = target.APIURL().Host
 		req.URL.Path = singleJoiningSlash(target.APIURL().Path, req.URL.Path)
+		req.Header.Set("SSO-User", username)
 		if isPlugin {
 			// for non k8s clients testing, like vanilla http clients accessing plugin proxy flows, testing has proven that the request
 			// host needs to be updated in addition to the URL in order to have the reverse proxy contact the openshift
