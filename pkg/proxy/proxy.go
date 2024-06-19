@@ -431,7 +431,8 @@ func (p *Proxy) listUserWorkspaces(ctx echo.Context, workspaceName string) ([]to
 
 func (p *Proxy) handleRequestAndRedirect(ctx echo.Context) error {
 	requestReceivedTime := ctx.Get(context.RequestReceivedTime).(time.Time)
-	ctx.Set(context.PublicViewerEnabled, configuration.GetRegistrationServiceConfig().PublicViewer().Enabled())
+	publicViewerEnabled := configuration.GetRegistrationServiceConfig().PublicViewer().Enabled()
+	ctx.Set(context.PublicViewerEnabled, publicViewerEnabled)
 	proxyPluginName, cluster, err := p.processRequest(ctx)
 	if err != nil {
 		p.metrics.RegServProxyAPIHistogramVec.WithLabelValues(fmt.Sprintf("%d", http.StatusNotAcceptable), metrics.MetricLabelRejected).Observe(time.Since(requestReceivedTime).Seconds())
