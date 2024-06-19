@@ -387,6 +387,10 @@ func (p *Proxy) getClusterAccess(ctx echo.Context, userID, username, workspaceNa
 
 	publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool)
 	hasDirectAccess := func() bool {
+		if signup == nil {
+			return false
+		}
+
 		for _, b := range w.Status.Bindings {
 			if b.MasterUserRecord == signup.CompliantUsername {
 				return true
