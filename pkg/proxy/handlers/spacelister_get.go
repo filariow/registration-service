@@ -106,7 +106,6 @@ func GetUserWorkspaceWithBindings(ctx echo.Context, spaceLister *SpaceLister, wo
 	if err != nil {
 		return nil, err
 	}
-
 	// signup is not ready
 	if userSignup == nil || space == nil {
 		return nil, nil
