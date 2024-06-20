@@ -65,7 +65,7 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister) ([]toolchain
 // If PublicViewer is enabled, the list will contain at least the PublicViewer username.
 func getMURNamesForList(ctx echo.Context, signup *signup.Signup) []string {
 	names := []string{}
-	if signup.CompliantUsername != "" {
+	if signup != nil && signup.CompliantUsername != "" {
 		names = append(names, signup.CompliantUsername)
 	}
 	if context.IsPublicViewerEnabled(ctx) {
