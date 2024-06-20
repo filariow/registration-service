@@ -49,7 +49,9 @@ func (s *ServiceImpl) GetClusterAccess(userID, username, workspace, proxyPluginN
 	return s.getSpaceAccess(userID, username, workspace, proxyPluginName, publicViewerEnabled)
 }
 
+// getSpaceAccess retrieves space access for an user
 func (s *ServiceImpl) getSpaceAccess(userID, username, workspace, proxyPluginName string, publicViewerEnabled bool) (*access.ClusterAccess, error) {
+	// retrieve the user's complaint name
 	userName, err := s.getUserSignupComplaintName(userID, username, publicViewerEnabled)
 	if err != nil {
 		return nil, err
@@ -67,11 +69,16 @@ func (s *ServiceImpl) getSpaceAccess(userID, username, workspace, proxyPluginNam
 }
 
 func (s *ServiceImpl) getUserSignupComplaintName(userID, username string, publicViewerEnabled bool) (string, error) {
+	// if PublicViewer is enabled and the requested user is the PublicViewer, than no lookup is required
 	if publicViewerEnabled && username == userID && userID == toolchainv1alpha1.KubesawAuthenticatedUsername {
 		return username, nil
 	}
 
-	userSignup, err := s.Services().SignupService().GetSignupFromInformer(nil, userID, username, false) // don't check for usersignup complete status, since it might cause the proxy blocking the request and returning an error when quick transitions from ready to provisioning are happening.
+	// retrieve the UserSignup from cache
+	//
+	// don't check for usersignup complete status, since it might cause the proxy blocking the request
+	// and returning an error when quick transitions from ready to provisioning are happening.
+	userSignup, err := s.Services().SignupService().GetSignupFromInformer(nil, userID, username, false)
 	if err != nil {
 		return "", err
 	}
@@ -85,8 +92,11 @@ func (s *ServiceImpl) getUserSignupComplaintName(userID, username string, public
 	return userSignup.CompliantUsername, nil
 }
 
+// getClusterAccessForDefaultWorkspace retrieves the cluster for the user's default workspace
 func (s *ServiceImpl) getClusterAccessForDefaultWorkspace(userID, username, proxyPluginName string) (*access.ClusterAccess, error) {
-	signup, err := s.Services().SignupService().GetSignupFromInformer(nil, userID, username, false) // don't check for usersignup complete status, since it might cause the proxy blocking the request and returning an error when quick transitions from ready to provisioning are happening.
+	// don't check for usersignup complete status, since it might cause the proxy blocking the request
+	// and returning an error when quick transitions from ready to provisioning are happening.
+	signup, err := s.Services().SignupService().GetSignupFromInformer(nil, userID, username, false)
 	if err != nil {
 		return nil, err
 	}
