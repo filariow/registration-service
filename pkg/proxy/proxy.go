@@ -277,8 +277,8 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 	// set workspace context for logging
 	ctx.Set(context.WorkspaceKey, workspaceName)
 
-	// if workspace is not defined in the HTTP request,
-	// retrieve the user's home workspace and process the request
+	// if the target workspace is NOT explicitly declared in the HTTP request,
+	// process the request against the user's home workspace
 	if workspaceName == "" {
 		cluster, err := p.processHomeWorkspaceRequest(ctx, userID, username, proxyPluginName)
 		if err != nil {
@@ -287,8 +287,8 @@ func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess,
 		return proxyPluginName, cluster, nil
 	}
 
-	// if the workspace is defined in the HTTP request,
-	// retrieve the request workspace and process the request
+	// if the target workspace is explicitly declared in the HTTP request,
+	// process the request against the declared workspace
 	cluster, err := p.processWorkspaceRequest(ctx, userID, username, workspaceName, proxyPluginName)
 	if err != nil {
 		return "", nil, err
@@ -310,8 +310,8 @@ func (p *Proxy) processHomeWorkspaceRequest(ctx echo.Context, userID, username, 
 		return nil, crterrors.NewInternalError(errs.New("unable to retrieve user workspaces"), err.Error())
 	}
 
-	// if a namespace is declared in the HTTP Request,
-	// it checks whether the user's home workspace contains it
+	// check whether the user's has access to the home workspace
+	// and whether the requestedNamespace -if any- exists in the workspace.
 	requestedNamespace := namespaceFromCtx(ctx)
 	if err := validateWorkspaceRequest("", requestedNamespace, workspaces); err != nil {
 		return nil, crterrors.NewForbiddenError("invalid workspace request", err.Error())
@@ -329,14 +329,14 @@ func (p *Proxy) processWorkspaceRequest(ctx echo.Context, userID, username, work
 	}
 
 	// before proxying the request, verify that the user has a spacebinding for
-	// the workspace and that the namespace (if any) belongs to the workspace
+	// the workspace and that the namespace -if any- belongs to the workspace
 	workspaces, err := p.listUserWorkspaces(ctx, workspaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	// if a namespace is declared in the HTTP Request,
-	// it checks whether the user's home workspace contains it.
+	// check whether the user's has access to the home workspace
+	// and whether the requestedNamespace -if any- exists in the workspace.
 	requestedNamespace := namespaceFromCtx(ctx)
 	if err := validateWorkspaceRequest(workspaceName, requestedNamespace, workspaces); err != nil {
 		return nil, crterrors.NewForbiddenError("invalid workspace request", err.Error())
@@ -376,29 +376,32 @@ func (p *Proxy) validateUserAccess(ctx echo.Context, userID, username string) er
 		return nil
 	}
 
-	// retrieve UserSignup
-	userSignup, err := p.app.SignupService().GetSignupFromInformer(nil, userID, username, false) // don't check for usersignup complete status, since it might cause the proxy blocking the request and returning an error when quick transitions from ready to provisioning are happening.
+	// retrieve the UserSignup for the requesting user.
+	//
+	// UserSignup complete status is not checked, since it might cause the proxy blocking the request
+	// and returning an error when quick transitions from ready to provisioning are happening.
+	userSignup, err := p.app.SignupService().GetSignupFromInformer(nil, userID, username, false)
 	if err != nil {
 		return err
 	}
 
-	// if signup has the CompliantUsername set it means that MUR was created and useraccount is provisioned
+	// if the UserSignup is nil or has NOT the CompliantUsername set,
+	// it means that MUR was NOT created and useraccount is NOT provisioned yet
 	// TODO(@filariow): should we also check if the user is Banned?
 	if userSignup == nil || userSignup.CompliantUsername == "" {
 		cause := errs.New("user is not provisioned (yet)")
 		log.Error(nil, cause, fmt.Sprintf("signup object: %+v", userSignup))
 		return cause
 	}
-
-	// user is Approved
 	return nil
 }
 
-// getClusterAccess retrieves the access to.
+// getClusterAccess retrieves the access to the cluster hosting the requested workspace,
+// if the user has access to it.
+// Access can be either direct (an SpaceBinding linking the user to the workspace exists)
+// or community (a SpaceBinding linking the PublicViewer user to the workspace exists).
 func (p *Proxy) getClusterAccess(ctx echo.Context, userID, username, workspaceName, proxyPluginName string, workspaces []toolchainv1alpha1.Workspace) (*access.ClusterAccess, error) {
 	// retrieve by name the workspace from the list of workspaces the user has access to.
-	// Access can be either direct (an SpaceBinding linking the user to the workspace exists)
-	// or community (a SpaceBinding linking the PublicViewer user to the workspace exists).
 	w := findWorkspaceByName(workspaceName, workspaces)
 	if w == nil {
 		return nil, crterrors.NewInternalError(errs.New("unable to get target cluster"), "workspace not found")
@@ -433,8 +436,8 @@ func (p *Proxy) getClusterAccess(ctx echo.Context, userID, username, workspaceNa
 	return cluster, nil
 }
 
-// hasDirectAccess checks if an userSignup has access to a workspace.
-// Workspace needs to have the `status.bindings` property set.
+// hasDirectAccess checks if an UserSignup has access to a workspace.
+// Workspace's bindings are obtained from its `status.bindings` property.
 func hasDirectAccess(signup *signup.Signup, workspace *toolchainv1alpha1.Workspace) bool {
 	if signup == nil || workspace == nil {
 		return false
@@ -806,6 +809,9 @@ func replaceTokenInWebsocketRequest(req *http.Request, newToken string) {
 	req.Header.Set(ph, strings.Join(protocols, ","))
 }
 
+// validateWorkspaceRequest checks whether the requested workspace is in the list of workspaces the user has visibility on (retrieved via the spaceLister).
+// If `requestedWorkspace` is zero, this function looks for the home workspace (the one with `status.Type` set to `home`).
+// If `requestedNamespace` is NOT zero, this function checks if the namespace exists in the workspace.
 func validateWorkspaceRequest(requestedWorkspace, requestedNamespace string, workspaces []toolchainv1alpha1.Workspace) error {
 	// check workspace access
 	isHomeWSRequested := requestedWorkspace == ""
