@@ -51,7 +51,7 @@ func GetUserWorkspace(ctx echo.Context, spaceLister *SpaceLister, workspaceName 
 		ctx.Logger().Error(errs.Wrap(err, "provisioned user signup error"))
 		return nil, err
 	}
-
+	// signup is not ready
 	if userSignup == nil {
 		return nil, nil
 	}
@@ -188,7 +188,6 @@ func getUserSignupAndSpace(ctx echo.Context, spaceLister *SpaceLister, workspace
 		ctx.Logger().Error(errs.Wrap(err, "unable to get space"))
 		return userSignup, nil, nil
 	}
-
 	return userSignup, space, err
 }
 
