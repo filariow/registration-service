@@ -16,6 +16,7 @@ import (
 	toolchainv1alpha1 "github.com/codeready-toolchain/api/api/v1alpha1"
 	"github.com/codeready-toolchain/registration-service/pkg/context"
 	"github.com/codeready-toolchain/registration-service/pkg/metrics"
+	"github.com/codeready-toolchain/registration-service/pkg/signup"
 )
 
 func HandleSpaceListRequest(spaceLister *SpaceLister) echo.HandlerFunc {
@@ -39,21 +40,13 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister) ([]toolchain
 	if err != nil {
 		return nil, err
 	}
-	if signup == nil {
+	// signup is not ready
+	if signup == nil && !context.IsPublicViewerEnabled(ctx) {
 		return nil, nil
 	}
 
-	// signup is not ready
-	murNames := func() []string {
-		names := []string{}
-		if signup.CompliantUsername != "" {
-			names = append(names, signup.CompliantUsername)
-		}
-		if context.IsPublicViewerEnabled(ctx) {
-			names = append(names, toolchainv1alpha1.KubesawAuthenticatedUsername)
-		}
-		return names
-	}()
+	// get MUR Names
+	murNames := getMURNamesForList(ctx, signup)
 	if len(murNames) == 0 {
 		return nil, nil
 	}
@@ -66,6 +59,19 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister) ([]toolchain
 	}
 
 	return workspacesFromSpaceBindings(ctx, spaceLister, signup.Name, spaceBindings), nil
+}
+
+// getMURNamesForList returns a list MasterUserRecord names to use in listing Workspaces.
+// If PublicViewer is enabled, the list will contain at least the PublicViewer username.
+func getMURNamesForList(ctx echo.Context, signup *signup.Signup) []string {
+	names := []string{}
+	if signup.CompliantUsername != "" {
+		names = append(names, signup.CompliantUsername)
+	}
+	if context.IsPublicViewerEnabled(ctx) {
+		names = append(names, toolchainv1alpha1.KubesawAuthenticatedUsername)
+	}
+	return names
 }
 
 func listWorkspaceResponse(ctx echo.Context, workspaces []toolchainv1alpha1.Workspace) error {
