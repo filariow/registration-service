@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (s *TestProxySuite) TestProxyCommunity() {
+func (s *TestProxySuite) TestProxyCommunityEnabled() {
 	// given
 
 	port := "30456"
