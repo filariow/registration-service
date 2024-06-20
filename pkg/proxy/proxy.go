@@ -372,7 +372,7 @@ func (p *Proxy) validateSpace(workspaceName string) error {
 // If public-viewer is enabled, user validation is skipped.
 func (p *Proxy) validateUserAccess(ctx echo.Context, userID, username string) error {
 	// skip if public-viewer is enabled: read-only operations on community workspaces are always permitted.
-	if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled {
+	if context.IsPublicViewerEnabled(ctx) {
 		return nil
 	}
 
@@ -411,7 +411,7 @@ func (p *Proxy) getClusterAccess(ctx echo.Context, userID, username, workspaceNa
 	}
 
 	// if PublicViewer is enabled and user has no direct access to the workspace, proceed as PublicViewer
-	publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool)
+	publicViewerEnabled := context.IsPublicViewerEnabled(ctx)
 	if publicViewerEnabled && !hasDirectAccess(signup, w) {
 		cluster, err := p.app.MemberClusterService().GetClusterAccess(
 			toolchainv1alpha1.KubesawAuthenticatedUsername,

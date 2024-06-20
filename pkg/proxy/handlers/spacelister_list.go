@@ -49,7 +49,7 @@ func ListUserWorkspaces(ctx echo.Context, spaceLister *SpaceLister) ([]toolchain
 		if signup.CompliantUsername != "" {
 			names = append(names, signup.CompliantUsername)
 		}
-		if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled {
+		if context.IsPublicViewerEnabled(ctx) {
 			names = append(names, toolchainv1alpha1.KubesawAuthenticatedUsername)
 		}
 		return names

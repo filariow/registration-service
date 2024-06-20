@@ -130,7 +130,8 @@ func GetUserWorkspaceWithBindings(ctx echo.Context, spaceLister *SpaceLister, wo
 	// check if user has access to this workspace
 	userBinding := filterUserSpaceBinding(userSignup.CompliantUsername, allSpaceBindings)
 	if userBinding == nil {
-		if publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool); publicViewerEnabled {
+		// if PublicViewer is enabled, check if the Space is visibile to PublicViewer
+		if context.IsPublicViewerEnabled(ctx) {
 			userBinding = filterUserSpaceBinding(toolchainv1alpha1.KubesawAuthenticatedUsername, allSpaceBindings)
 		}
 
@@ -175,8 +176,7 @@ func getUserSignupAndSpace(ctx echo.Context, spaceLister *SpaceLister, workspace
 	if err != nil {
 		return nil, nil, err
 	}
-	publicViewerEnabled, _ := ctx.Get(context.PublicViewerEnabled).(bool)
-	if userSignup == nil && publicViewerEnabled {
+	if userSignup == nil && context.IsPublicViewerEnabled(ctx) {
 		userSignup = &signup.Signup{
 			CompliantUsername: toolchainv1alpha1.KubesawAuthenticatedUsername,
 			Name:              toolchainv1alpha1.KubesawAuthenticatedUsername,
