@@ -149,16 +149,12 @@ func (l *Logger) InfoEchof(ctx echo.Context, msg string, args ...string) {
 	ctxFields = append(ctxFields, "url")
 	ctxFields = append(ctxFields, ctx.Request().URL)
 
-	if ssoUser, ok := ctx.Get("SSO-User").(string); ok {
-		ctxFields = append(ctxFields, "SSO-User", ssoUser)
-	}
-
-	if impersonateUser, ok := ctx.Get("Impersonate-User").(string); ok {
-		ctxFields = append(ctxFields, "Impersonate-User", impersonateUser)
+	if impersonateUser, ok := ctx.Get(context.ImpersonateUser).(string); ok {
+		ctxFields = append(ctxFields, "impersonate-user", impersonateUser)
 	}
 
 	if publicViewerEnabled, ok := ctx.Get(context.PublicViewerEnabled).(bool); ok {
-		ctxFields = append(ctxFields, "PublicViewerEnabled", publicViewerEnabled)
+		ctxFields = append(ctxFields, "public-viewer-enabled", publicViewerEnabled)
 	}
 
 	l.infof(ctxFields, msg, args...)

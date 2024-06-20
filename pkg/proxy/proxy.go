@@ -267,6 +267,7 @@ func (p *Proxy) health(ctx echo.Context) error {
 func (p *Proxy) processRequest(ctx echo.Context) (string, *access.ClusterAccess, error) {
 	userID, _ := ctx.Get(context.SubKey).(string)
 	username, _ := ctx.Get(context.UsernameKey).(string)
+
 	proxyPluginName, workspaceName, err := getWorkspaceContext(ctx.Request())
 	if err != nil {
 		return "", nil, crterrors.NewBadRequest("unable to get workspace context", err.Error())
@@ -593,13 +594,15 @@ func (p *Proxy) newReverseProxy(ctx echo.Context, target *access.ClusterAccess, 
 	req := ctx.Request()
 	targetQuery := target.APIURL().RawQuery
 	username, _ := ctx.Get(context.UsernameKey).(string)
-	ctx.Set("Impersonate-User", target.Username())
+	ctx.Set(context.ImpersonateUser, target.Username())
+
 	director := func(req *http.Request) {
 		origin := req.URL.String()
 		req.URL.Scheme = target.APIURL().Scheme
 		req.URL.Host = target.APIURL().Host
 		req.URL.Path = singleJoiningSlash(target.APIURL().Path, req.URL.Path)
 		req.Header.Set("SSO-User", username)
+
 		if isPlugin {
 			// for non k8s clients testing, like vanilla http clients accessing plugin proxy flows, testing has proven that the request
 			// host needs to be updated in addition to the URL in order to have the reverse proxy contact the openshift
