@@ -91,6 +91,13 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 		}
 
 		tests := map[string]testCase{
+			// Given smith2 owns a workspace named communityspace
+			// And   communityspace is publicly visible (shared with PublicViewer)
+			// When  smith2 requests the list of pods in workspace communityspace
+			// Then  the request is forwarded from the proxy
+			// And   the request impersonates smith2
+			// And   the request's SSO-User Header is set to smith2's ID
+			// And   the request is successful
 			"plain http actual request as owner": {
 				ProxyRequestMethod:  "GET",
 				ProxyRequestHeaders: map[string][]string{"Authorization": {"Bearer " + s.token(owner)}},
@@ -103,6 +110,15 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 				RequestPath:                 fmt.Sprintf("http://localhost:%s/workspaces/communityspace/api/communityspace/pods", port),
 				ExpectedResponse:            httpTestServerResponse,
 			},
+			// Given smith2 owns a workspace named communityspace
+			// And   communityspace is publicly visible (shared with PublicViewer)
+			// And   a user named communityuser exists
+			// And   smith2's communityspace is not directly shared with communityuser
+			// When  communityuser requests the list of pods in workspace communityspace
+			// Then  the request is forwarded from the proxy
+			// And   the request impersonates the PublicViewer
+			// And   the request's SSO-User Header is set to communityuser's ID
+			// And   the request is successful
 			"plain http actual request as community user": {
 				ProxyRequestMethod:  "GET",
 				ProxyRequestHeaders: map[string][]string{"Authorization": {"Bearer " + s.token(communityUser)}},
@@ -115,6 +131,13 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 				RequestPath:                 fmt.Sprintf("http://localhost:%s/workspaces/communityspace/api/communityspace/pods", port),
 				ExpectedResponse:            httpTestServerResponse,
 			},
+			// Given user alice exists
+			// And   alice owns a private workspace
+			// When  smith2 requests the list of pods in alice's workspace
+			// Then  the request is forwarded from the proxy
+			// And   the request impersonates smith2
+			// And   the request's SSO-User Header is set to smith2's ID
+			// And   the request is NOT successful
 			"plain http actual request as not owner to private workspace": {
 				ProxyRequestMethod:  "GET",
 				ProxyRequestHeaders: map[string][]string{"Authorization": {"Bearer " + s.token(owner)}},
