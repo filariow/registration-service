@@ -68,6 +68,7 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 	s.Run("successfully proxy", func() {
 		owner := uuid.New()
 		communityUser := uuid.New()
+		httpTestServerResponse := "my response"
 
 		// Start the member-2 API Server
 		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -75,7 +76,7 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 			// Set the Access-Control-Allow-Origin header to make sure it's overridden by the proxy response modifier
 			w.Header().Set("Access-Control-Allow-Origin", "dummy")
 			w.WriteHeader(http.StatusOK)
-			_, err := w.Write([]byte("my response"))
+			_, err := w.Write([]byte(httpTestServerResponse))
 			require.NoError(s.T(), err)
 		}))
 		defer testServer.Close()
@@ -86,6 +87,7 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 			ExpectedAPIServerRequestHeaders http.Header
 			ExpectedProxyResponseStatus     int
 			RequestPath                     string
+			ExpectedResponse                string
 		}
 
 		tests := map[string]testCase{
@@ -99,6 +101,7 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 				},
 				ExpectedProxyResponseStatus: http.StatusOK,
 				RequestPath:                 fmt.Sprintf("http://localhost:%s/workspaces/communityspace/api/communityspace/pods", port),
+				ExpectedResponse:            httpTestServerResponse,
 			},
 			"plain http actual request as community user": {
 				ProxyRequestMethod:  "GET",
@@ -110,6 +113,19 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 				},
 				ExpectedProxyResponseStatus: http.StatusOK,
 				RequestPath:                 fmt.Sprintf("http://localhost:%s/workspaces/communityspace/api/communityspace/pods", port),
+				ExpectedResponse:            httpTestServerResponse,
+			},
+			"plain http actual request as not owner to private workspace": {
+				ProxyRequestMethod:  "GET",
+				ProxyRequestHeaders: map[string][]string{"Authorization": {"Bearer " + s.token(owner)}},
+				ExpectedAPIServerRequestHeaders: map[string][]string{
+					"Authorization":    {"Bearer clusterSAToken"},
+					"Impersonate-User": {"smith2"},
+					"SSO-User":         {"username-" + owner.String()},
+				},
+				ExpectedProxyResponseStatus: http.StatusForbidden,
+				RequestPath:                 fmt.Sprintf("http://localhost:%s/workspaces/alice-private/api/alice-private/pods", port),
+				ExpectedResponse:            "invalid workspace request: access to workspace 'alice-private' is forbidden",
 			},
 		}
 
@@ -154,6 +170,16 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 							Ready: true,
 						},
 					}),
+					fake.Signup(communityUser.String(), &signup.Signup{
+						Name:              "alice",
+						APIEndpoint:       testServer.URL,
+						ClusterName:       "member-2",
+						CompliantUsername: "alice",
+						Username:          "alice@",
+						Status: signup.Status{
+							Ready: true,
+						},
+					}),
 				)
 				s.Application.MockSignupService(fakeApp.SignupServiceMock)
 				inf := fake.NewFakeInformer()
@@ -161,14 +187,17 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 					switch name {
 					case "communityspace":
 						return fake.NewSpace("communityspace", "member-2", "smith2"), nil
+					case "alice-private":
+						return fake.NewSpace("alice-private", "member-2", "alice"), nil
 					}
 					return nil, fmt.Errorf("space not found error")
 				}
 
 				sbmycoolSmith2 := fake.NewSpaceBinding("communityspace-smith2", "smith2", "communityspace", "admin")
 				commSpacePublicViewer := fake.NewSpaceBinding("communityspace-publicviewer", toolchainv1alpha1.KubesawAuthenticatedUsername, "communityspace", "viewer")
+				alicePrivate := fake.NewSpaceBinding("alice-default", "alice", "alice-default", "admin")
 
-				cli := fake.InitClient(s.T(), sbmycoolSmith2, commSpacePublicViewer)
+				cli := fake.InitClient(s.T(), sbmycoolSmith2, commSpacePublicViewer, alicePrivate)
 				inf.ListSpaceBindingFunc = func(reqs ...labels.Requirement) ([]toolchainv1alpha1.SpaceBinding, error) {
 					sbs := toolchainv1alpha1.SpaceBindingList{}
 					opts := &client.ListOptions{
@@ -219,7 +248,7 @@ func (s *TestProxySuite) checkProxyCommunityOK(fakeApp *fake.ProxyFakeApp, p *Pr
 				require.NotNil(s.T(), resp)
 				defer resp.Body.Close()
 				assert.Equal(s.T(), tc.ExpectedProxyResponseStatus, resp.StatusCode)
-				s.assertResponseBody(resp, "my response")
+				s.assertResponseBody(resp, tc.ExpectedResponse)
 			})
 		}
 	})
