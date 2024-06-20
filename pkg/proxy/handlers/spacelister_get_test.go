@@ -33,7 +33,12 @@ import (
 )
 
 func TestSpaceListerGet(t *testing.T) {
-	cfg := &configuration.PublicViewerConfig{Config: &toolchainv1alpha1.PublicViewerConfiguration{Enabled: false}}
+	testSpaceListerGet(t, true)
+	testSpaceListerGet(t, false)
+}
+
+func testSpaceListerGet(t *testing.T, publicViewerEnabled bool) {
+	cfg := &configuration.PublicViewerConfig{Config: &toolchainv1alpha1.PublicViewerConfiguration{Enabled: publicViewerEnabled}}
 	fakeSignupService, fakeClient := buildSpaceListerFakes(t, cfg)
 
 	memberFakeClient := fake.InitClient(t,
@@ -591,7 +596,6 @@ func TestSpaceListerGet(t *testing.T) {
 }
 
 func TestGetUserWorkspace(t *testing.T) {
-
 	fakeSignupService := fake.NewSignupService(
 		newSignup("batman", "batman.space", true),
 		newSignup("robin", "robin.space", true),
