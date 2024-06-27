@@ -122,7 +122,7 @@ func (r RegistrationServiceConfig) Print() {
 }
 
 func (r RegistrationServiceConfig) PublicViewer() commonconfig.PublicViewerConfig {
-	return commonconfig.PublicViewerConfig{Config: r.cfg.PublicViewerConfig}
+	return commonconfig.PublicViewerConfig{Config: r.cfg.Host.PublicViewerConfig}
 }
 
 func (r RegistrationServiceConfig) Environment() string {
