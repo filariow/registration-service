@@ -479,7 +479,7 @@ func (p *Proxy) listUserWorkspaces(ctx echo.Context, workspaceName string) ([]to
 
 func (p *Proxy) handleRequestAndRedirect(ctx echo.Context) error {
 	requestReceivedTime := ctx.Get(context.RequestReceivedTime).(time.Time)
-	publicViewerEnabled := configuration.GetRegistrationServiceConfig().PublicViewer().Enabled()
+	publicViewerEnabled := configuration.GetRegistrationServiceConfig().PublicViewerEnabled()
 	ctx.Set(context.PublicViewerEnabled, publicViewerEnabled)
 	proxyPluginName, cluster, err := p.processRequest(ctx)
 	if err != nil {

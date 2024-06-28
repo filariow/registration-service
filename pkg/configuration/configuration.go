@@ -121,8 +121,8 @@ func (r RegistrationServiceConfig) Print() {
 	logger.Info("Registration Service Configuration", "config", r.cfg.Host.RegistrationService)
 }
 
-func (r RegistrationServiceConfig) PublicViewer() commonconfig.PublicViewerConfig {
-	return commonconfig.PublicViewerConfig{Config: r.cfg.Host.PublicViewerConfig}
+func (r RegistrationServiceConfig) PublicViewerEnabled() bool {
+	return r.cfg.Host.PublicViewerConfig != nil && r.cfg.Host.PublicViewerConfig.Enabled
 }
 
 func (r RegistrationServiceConfig) Environment() string {

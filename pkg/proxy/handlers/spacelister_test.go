@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	commonconfig "github.com/codeready-toolchain/toolchain-common/pkg/configuration"
 	"github.com/codeready-toolchain/toolchain-common/pkg/test"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,7 +20,7 @@ import (
 	spacetest "github.com/codeready-toolchain/toolchain-common/pkg/test/space"
 )
 
-func buildSpaceListerFakes(t *testing.T, publicViewerConfig *commonconfig.PublicViewerConfig) (*fake.SignupService, *test.FakeClient) {
+func buildSpaceListerFakes(t *testing.T, publicViewerEnabled bool) (*fake.SignupService, *test.FakeClient) {
 	signups := []fake.SignupDef{
 		newSignup("dancelover", "dance.lover", true),
 		newSignup("movielover", "movie.lover", true),
@@ -35,7 +34,7 @@ func buildSpaceListerFakes(t *testing.T, publicViewerConfig *commonconfig.Public
 		newSignup("childspace", "child.space", true),
 		newSignup("grandchildspace", "grandchild.space", true),
 	}
-	if publicViewerConfig.Enabled() {
+	if publicViewerEnabled {
 		signups = append(signups,
 			newSignup("communityspace", "community.space", true),
 			newSignup("communitylover", "community.lover", true),
@@ -105,7 +104,7 @@ func buildSpaceListerFakes(t *testing.T, publicViewerConfig *commonconfig.Public
 		//nstemplatetier
 		fake.NewBase1NSTemplateTier(),
 	}
-	if publicViewerConfig.Enabled() {
+	if publicViewerEnabled {
 		objs = append(objs,
 			fake.NewSpaceBinding("communityspace-sb", "communityspace", "communityspace", "admin"),
 			fake.NewSpaceBinding("community-sb", toolchainv1alpha1.KubesawAuthenticatedUsername, "communityspace", "viewer"),

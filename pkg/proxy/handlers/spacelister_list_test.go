@@ -22,14 +22,11 @@ import (
 	"github.com/codeready-toolchain/registration-service/pkg/proxy/handlers"
 	"github.com/codeready-toolchain/registration-service/pkg/signup"
 	"github.com/codeready-toolchain/registration-service/test/fake"
-	commonconfig "github.com/codeready-toolchain/toolchain-common/pkg/configuration"
 )
 
 func TestSpaceListerListCommunity(t *testing.T) {
-	cfg := &commonconfig.PublicViewerConfig{
-		Config: &toolchainv1alpha1.PublicViewerConfiguration{Enabled: true},
-	}
-	fakeSignupService, fakeClient := buildSpaceListerFakes(t, cfg)
+	publicViewerEnabled := true
+	fakeSignupService, fakeClient := buildSpaceListerFakes(t, publicViewerEnabled)
 	tests := map[string]struct {
 		username             string
 		expectedWs           []toolchainv1alpha1.Workspace
@@ -80,7 +77,7 @@ func TestSpaceListerListCommunity(t *testing.T) {
 				ctx.Set(rcontext.RequestReceivedTime, time.Now())
 
 				// when
-				ctx.Set(rcontext.PublicViewerEnabled, cfg.Enabled())
+				ctx.Set(rcontext.PublicViewerEnabled, publicViewerEnabled)
 				err := handlers.HandleSpaceListRequest(s)(ctx)
 
 				// then
@@ -105,10 +102,8 @@ func TestSpaceListerListCommunity(t *testing.T) {
 }
 
 func TestSpaceListerList(t *testing.T) {
-	cfg := &commonconfig.PublicViewerConfig{
-		Config: &toolchainv1alpha1.PublicViewerConfiguration{Enabled: false},
-	}
-	fakeSignupService, fakeClient := buildSpaceListerFakes(t, cfg)
+	publicViewerEnabled := false
+	fakeSignupService, fakeClient := buildSpaceListerFakes(t, publicViewerEnabled)
 
 	t.Run("HandleSpaceListRequest", func(t *testing.T) {
 		// given
@@ -207,7 +202,7 @@ func TestSpaceListerList(t *testing.T) {
 				ctx.Set(rcontext.RequestReceivedTime, time.Now())
 
 				// when
-				ctx.Set(rcontext.PublicViewerEnabled, cfg.Enabled())
+				ctx.Set(rcontext.PublicViewerEnabled, publicViewerEnabled)
 				err := handlers.HandleSpaceListRequest(s)(ctx)
 
 				// then

@@ -32,7 +32,6 @@ import (
 
 	toolchainv1alpha1 "github.com/codeready-toolchain/api/api/v1alpha1"
 	commoncluster "github.com/codeready-toolchain/toolchain-common/pkg/cluster"
-	commonconfig "github.com/codeready-toolchain/toolchain-common/pkg/configuration"
 	commontest "github.com/codeready-toolchain/toolchain-common/pkg/test"
 	authsupport "github.com/codeready-toolchain/toolchain-common/pkg/test/auth"
 	testconfig "github.com/codeready-toolchain/toolchain-common/pkg/test/config"
@@ -67,9 +66,6 @@ func (s *TestProxySuite) TestProxy() {
 	_, err := auth.InitializeDefaultTokenParser()
 	require.NoError(s.T(), err)
 
-	cfg := commonconfig.PublicViewerConfig{
-		Config: &toolchainv1alpha1.PublicViewerConfiguration{Enabled: false},
-	}
 	for _, environment := range []testconfig.EnvName{testconfig.E2E, testconfig.Dev, testconfig.Prod} {
 		s.Run("for environment "+string(environment), func() {
 
@@ -91,7 +87,7 @@ func (s *TestProxySuite) TestProxy() {
 			s.checkPlainHTTPErrors(fakeApp)
 			s.checkWebsocketsError()
 			s.checkWebLogin()
-			s.checkProxyOK(fakeApp, p, cfg)
+			s.checkProxyOK(fakeApp, p, false)
 		})
 	}
 }
@@ -402,7 +398,7 @@ func (s *TestProxySuite) checkWebLogin() {
 	})
 }
 
-func (s *TestProxySuite) checkProxyOK(fakeApp *fake.ProxyFakeApp, p *Proxy, cfg commonconfig.PublicViewerConfig) {
+func (s *TestProxySuite) checkProxyOK(fakeApp *fake.ProxyFakeApp, p *Proxy, publicViewerEnabled bool) {
 	s.Run("successfully proxy", func() {
 		userID := uuid.New()
 
@@ -685,7 +681,7 @@ func (s *TestProxySuite) checkProxyOK(fakeApp *fake.ProxyFakeApp, p *Proxy, cfg 
 											if req.Values().List()[0] == "smith2" || req.Values().List()[0] == "mycoolworkspace" {
 												spaceBindings = []toolchainv1alpha1.SpaceBinding{*fake.NewSpaceBinding("mycoolworkspace-smith2", "smith2", "mycoolworkspace", "admin")}
 											}
-											if cfg.Enabled() && req.Values().List()[0] == toolchainv1alpha1.KubesawAuthenticatedUsername {
+											if publicViewerEnabled && req.Values().List()[0] == toolchainv1alpha1.KubesawAuthenticatedUsername {
 												spaceBindings = []toolchainv1alpha1.SpaceBinding{*fake.NewSpaceBinding("communityspace-publicviewer", "publicviewer", "communityspace", "viewer")}
 											}
 										}
