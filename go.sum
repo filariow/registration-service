@@ -47,6 +47,8 @@ github.com/cloudflare/circl v1.1.0/go.mod h1:prBCrKB9DV4poKZY1l9zBXg2QJY7mvgRvtM
 github.com/cloudflare/circl v1.3.7 h1:qlCDlTPz2n9fu58M0Nh1J/JzcFpfgkFHHX3O35r5vcU=
 github.com/cloudflare/circl v1.3.7/go.mod h1:sRTcRWXGLrKw6yIGJ+l7amYJFfAXbZG0kBSc8r4zxgA=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
+github.com/codeready-toolchain/toolchain-common v0.0.0-20240613121043-7e6ef858cdff h1:bVWL+2eayFKUnEzdEAwltPs+pzbGlGDSmrM3oOV2Ams=
+github.com/codeready-toolchain/toolchain-common v0.0.0-20240613121043-7e6ef858cdff/go.mod h1:cyHrUfvBYEtsf+FbqQYmR9y0AQi9QAVtM3SUWLA5bd4=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -65,10 +67,8 @@ github.com/evanphx/json-patch v5.6.0+incompatible h1:jBYDEEiFBPxA0v50tFdvOzQQTCv
 github.com/evanphx/json-patch v5.6.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.6.0 h1:b91NhWfaz02IuVxO9faSllyAtNXHMPkC5J8sJCLunww=
 github.com/evanphx/json-patch/v5 v5.6.0/go.mod h1:G79N1coSVB93tBe7j6PhzjmR3/2VvlbKOFpnXhI9Bw4=
-github.com/filariow/toolchain-api v0.0.0-20240621164613-21096009ec46 h1:1GNtqxKxxRCFLK/bSoNZ3yhcQYcdCSNhaLqLToENd7E=
-github.com/filariow/toolchain-api v0.0.0-20240621164613-21096009ec46/go.mod h1:ie9p4LenCCS0LsnbWp6/xwpFDdCWYE0KWzUO6Sk1g0E=
-github.com/filariow/toolchain-common v0.0.0-20240621225435-5fc3b6ce2cc2 h1:cCFq82xJs7oqNnDbMZizwCF/2Mw4VLdeMQs4AXlFdiI=
-github.com/filariow/toolchain-common v0.0.0-20240621225435-5fc3b6ce2cc2/go.mod h1:mAV5uhoN4xyMIJvrNL/mV2fxqABdCqJAutf7vPXV5FA=
+github.com/filariow/toolchain-api v0.0.0-20240627085256-17ec63be2dde h1:n62Wd8R5zz99aI2XANiy7c17KQoZD+YCw03O9Q+VFIo=
+github.com/filariow/toolchain-api v0.0.0-20240627085256-17ec63be2dde/go.mod h1:ie9p4LenCCS0LsnbWp6/xwpFDdCWYE0KWzUO6Sk1g0E=
 github.com/fsnotify/fsnotify v1.5.4 h1:jRbGcIw6P2Meqdwuo0H1p6JVLbL5DHKAKlYndzMwVZI=
 github.com/gabriel-vasile/mimetype v1.4.3 h1:in2uUcidCuFcDKtdcBxlR0rJ1+fsokWf+uqxgUFjbI0=
 github.com/gabriel-vasile/mimetype v1.4.3/go.mod h1:d8uq/6HKRL6CGdk+aubisF/M5GcPfT7nKyLpA0lbSSk=
