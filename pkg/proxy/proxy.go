@@ -837,20 +837,33 @@ func validateWorkspaceRequest(requestedWorkspace, requestedNamespace string, wor
 		return fmt.Errorf("access to workspace '%s' is forbidden", requestedWorkspace)
 	}
 
-	// check namespace access
-	if requestedNamespace != "" {
-		allowedNamespace := false
-		namespaces := workspaces[allowedWorkspace].Status.Namespaces
-		for _, ns := range namespaces {
-			if ns.Name == requestedNamespace {
-				allowedNamespace = true
-				break
-			}
-		}
-		if !allowedNamespace {
-			return fmt.Errorf("access to namespace '%s' in workspace '%s' is forbidden", requestedNamespace, workspaces[allowedWorkspace].Name)
+	// prevent cross-workspaces requests
+	if requestedNamespace == "" {
+		return nil
+	}
+
+	// if the requested namespace is provisioned by the workspace, then it's ok
+	for _, ns := range workspaces[allowedWorkspace].Status.Namespaces {
+		if ns.Name == requestedNamespace {
+			return nil
 		}
 	}
+
+	// if the requested namespace is provisioned by another workspace,
+	// we have to reject the it
+	for k, ws := range workspaces {
+		if k == allowedWorkspace {
+			continue
+		}
+
+		for _, ns := range ws.Status.Namespaces {
+			if ns.Name == requestedNamespace {
+				return fmt.Errorf("access to namespace '%s' in workspace '%s' is forbidden", requestedNamespace, workspaces[allowedWorkspace].Name)
+			}
+		}
+	}
+
+	// otherwise let target cluster RBAC decide
 	return nil
 }
 
